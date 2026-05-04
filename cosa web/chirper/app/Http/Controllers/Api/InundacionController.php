@@ -20,10 +20,6 @@ class InundacionController extends Controller
 
         $query = Inundacion::query()->latest();
 
-        if (! $user->isAuthority()) {
-            $query->where('citizen_carnet', $user->carnet);
-        }
-
         if ($request->filled('provincia')) {
             $query->whereHas('municipio.provincia', function ($q) use ($request) {
                 $q->where('nombre', $request->provincia);
@@ -54,7 +50,7 @@ class InundacionController extends Controller
             ->first();
 
         $report = Inundacion::create([
-            'citizen_carnet' => $user->carnet,
+            'validador_id' => $user->isAuthority() ? $user->carnet : null,
             'latitud' => $data['latitud'],
             'longitud' => $data['longitud'],
             'municipio_id' => $muni?->id,
@@ -73,7 +69,7 @@ class InundacionController extends Controller
     {
         $this->authorize('view', $report);
 
-        $report->load(['citizen', 'responses.authority']);
+        $report->load(['validador', 'reportes']);
 
         return response()->json([
             'data' => new InundacionResource($report),
@@ -96,10 +92,15 @@ class InundacionController extends Controller
         $report->save();
 
         if ($user->isAuthority()) {
-            $this->refreshCitizenBanStatus((string) $report->citizen_carnet);
+            $report->load('reportes');
+            foreach ($report->reportes as $rep) {
+                if ($rep->citizen_carnet) {
+                    $this->refreshCitizenBanStatus((string) $rep->citizen_carnet);
+                }
+            }
         }
 
-        $report->load(['citizen']);
+        $report->load(['validador', 'reportes']);
 
         return response()->json([
             'data' => new InundacionResource($report),
@@ -108,9 +109,11 @@ class InundacionController extends Controller
 
     private function refreshCitizenBanStatus(string $citizenCarnet): void
     {
-        $falseReportsCount = Inundacion::query()
+        $falseReportsCount = \App\Models\Reporte::query()
             ->where('citizen_carnet', $citizenCarnet)
-            ->where('estado', 'falso_reporte')
+            ->whereHas('inundacion', function($q) {
+                $q->where('estado', 'falso_reporte');
+            })
             ->count();
 
         User::query()

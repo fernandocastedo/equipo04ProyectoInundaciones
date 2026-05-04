@@ -31,10 +31,6 @@ final class ReportController
 
         $query = Inundacion::query()->latest();
 
-        if ($role !== 'authority' && $carnet !== '') {
-            $query->where('citizen_carnet', $carnet);
-        }
-
         $reports = $query->with('reportes')->paginate(15, ['*'], 'page', $page);
 
         $reportesPendientes = [];
@@ -186,10 +182,6 @@ final class ReportController
         $carnet = (string) ($user['carnet'] ?? '');
 
         $query = Inundacion::query()->latest();
-
-        if ($role !== 'authority' && $carnet !== '') {
-            $query->where('citizen_carnet', $carnet);
-        }
 
         $latest = $query->first();
 

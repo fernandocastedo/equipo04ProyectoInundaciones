@@ -17,8 +17,6 @@ class Inundacion extends Model
         'validador_id',
         'latitud',
         'longitud',
-        'address',
-        'description',
         'intensidad_actual',
         'estado',
         'municipio_id',

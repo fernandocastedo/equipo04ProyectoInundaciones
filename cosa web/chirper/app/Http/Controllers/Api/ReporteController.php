@@ -21,7 +21,9 @@ class ReporteController extends Controller
             'lat_reporte' => 'required|numeric',
             'long_reporte' => 'required|numeric',
             'intensidad_propuesta' => 'required|string|in:baja,media,alta',
-            'foto_path' => 'nullable|string'
+            'foto' => 'nullable|image|max:5120',
+            'address' => 'nullable|string|max:255',
+            'description' => 'nullable|string'
         ]);
 
         if (empty($data['user_uuid']) && empty($data['citizen_carnet'])) {
@@ -46,6 +48,11 @@ class ReporteController extends Controller
         // Obtener datos del clima Open-Meteo
         $weatherData = $this->fetchWeatherData($data['lat_reporte'], $data['long_reporte']);
 
+        $fotoPath = null;
+        if ($request->hasFile('foto')) {
+            $fotoPath = $request->file('foto')->store('fotos', 'public');
+        }
+
         if ($reportePrevio) {
             // Actualizar reporte
             $reportePrevio->update([
@@ -54,7 +61,9 @@ class ReporteController extends Controller
                 'lat_reporte' => $data['lat_reporte'],
                 'long_reporte' => $data['long_reporte'],
                 'intensidad_propuesta' => $data['intensidad_propuesta'],
-                'foto_path' => $data['foto_path'] ?? $reportePrevio->foto_path,
+                'foto_path' => $fotoPath ?? $reportePrevio->foto_path,
+                'address' => $data['address'] ?? $reportePrevio->address,
+                'description' => $data['description'] ?? $reportePrevio->description,
                 'datos_clima_json' => $weatherData
             ]);
             $reporte = $reportePrevio;
@@ -69,7 +78,9 @@ class ReporteController extends Controller
                 'lat_reporte' => $data['lat_reporte'],
                 'long_reporte' => $data['long_reporte'],
                 'intensidad_propuesta' => $data['intensidad_propuesta'],
-                'foto_path' => $data['foto_path'] ?? null,
+                'foto_path' => $fotoPath,
+                'address' => $data['address'] ?? null,
+                'description' => $data['description'] ?? null,
                 'datos_clima_json' => $weatherData,
                 'estado_validacion' => 'pendiente'
             ]);
@@ -114,7 +125,7 @@ class ReporteController extends Controller
                 'estado' => 'activa',
                 'expira_at' => $this->calculateExpiration($reporte->intensidad_propuesta),
                 'description' => 'Generada automáticamente a partir del reporte.',
-                'citizen_carnet' => $reporte->citizen_carnet,
+                'validador_id' => $request->user()->carnet,
             ]);
 
             $reporte->update([

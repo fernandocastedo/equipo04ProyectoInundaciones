@@ -21,6 +21,8 @@ class Reporte extends Model
         'lat_reporte',
         'long_reporte',
         'intensidad_propuesta',
+        'address',
+        'description',
         'foto_path',
         'estado_validacion',
         'datos_clima_json',

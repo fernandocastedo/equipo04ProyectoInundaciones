@@ -9,7 +9,7 @@ class InundacionPolicy
 {
     public function view(User $user, Inundacion $report): bool
     {
-        return $user->isAuthority() || $report->citizen_carnet === $user->carnet;
+        return true; // Todos pueden ver las inundaciones consolidadas
     }
 
     public function create(User $user): bool
@@ -19,10 +19,6 @@ class InundacionPolicy
 
     public function update(User $user, Inundacion $report): bool
     {
-        if ($user->isAuthority()) {
-            return true;
-        }
-
-        return $report->citizen_carnet === $user->carnet && $report->status === 'open';
+        return $user->isAuthority();
     }
 }

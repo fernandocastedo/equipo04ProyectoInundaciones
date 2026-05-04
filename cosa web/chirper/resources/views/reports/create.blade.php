@@ -1,186 +1,320 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="mx-auto max-w-2xl">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-xl font-semibold tracking-tight">Crear reporte</h1>
-                <p class="mt-1 text-sm text-gray-600">Ingresá ubicación y descripción del evento.</p>
-            </div>
-            <a href="{{ route('reports.index', [], false) }}" class="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">Volver</a>
-        </div>
+<div class="mx-auto max-w-2xl py-8 px-4 sm:px-6 lg:px-8">
+    <div class="bg-white shadow rounded-lg p-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-6">Crear Reporte Detallado</h1>
 
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <form method="POST" action="{{ route('reports.store', [], false) }}" class="space-y-4">
+        <form id="detailedReportForm" class="space-y-6" enctype="multipart/form-data">
             @csrf
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="latitud">Latitud</label>
-                    <input id="latitud" name="latitud" type="number" step="any" value="{{ old('latitud') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
-                    @error('latitud')
-                        <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="longitud">Longitud</label>
-                    <input id="longitud" name="longitud" type="number" step="any" value="{{ old('longitud') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
-                    @error('longitud')
-                        <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
-                    @enderror
+            <!-- Ubicación GPS y Mapa -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Tu Ubicación (GPS)</label>
+                <div class="mt-1 flex items-center justify-between">
+                    <span id="gpsStatus" class="text-sm text-yellow-600">Obteniendo ubicación...</span>
+                    <button type="button" id="btnGetLocation" class="text-sm text-blue-600 hover:text-blue-800">Actualizar GPS</button>
                 </div>
             </div>
-            <div class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200 pointer-events-none opacity-70">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación del Reporte (Máx. 500m del GPS)</label>
+                <div id="map" class="h-64 bg-gray-100 rounded-lg border border-gray-300"></div>
+                <p id="distanceWarning" class="mt-2 text-sm text-red-600 hidden">El marcador está demasiado lejos de tu ubicación real (máximo 500m).</p>
+            </div>
+
+            <!-- Calculado automáticamente (Oculto visualmente pero útil para validación o info extra) -->
+            <div class="bg-gray-50 p-3 rounded-md border border-gray-200 pointer-events-none opacity-70">
                 <p class="text-xs text-gray-500 mb-2">Calculado automáticamente:</p>
                 <x-location-filter idPrefix="form" />
             </div>
 
-            <div class="-mt-1">
-                <p id="locationStatus" class="text-sm text-gray-600"></p>
+            <!-- Address -->
+            <div>
+                <label for="address" class="block text-sm font-medium text-gray-700">Dirección (opcional)</label>
+                <input id="address" name="address" type="text" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg py-3 px-4">
             </div>
 
+            <!-- Intensidad -->
             <div>
-                <label class="block text-sm font-medium mb-1" for="address">Dirección (opcional)</label>
-                <input id="address" name="address" type="text" value="{{ old('address') }}" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
-                @error('address')
-                    <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium mb-1" for="intensidad_actual">Intensidad</label>
-                <select id="intensidad_actual" name="intensidad_actual" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" required>
-                    @php($sev = old('intensidad_actual', 'baja'))
-                    <option value="baja" @selected($sev === 'baja')>Baja</option>
-                    <option value="media" @selected($sev === 'media')>Media</option>
-                    <option value="alta" @selected($sev === 'alta')>Alta</option>
+                <label for="intensidad" class="block text-sm font-medium text-gray-700">Intensidad Propuesta</label>
+                <select id="intensidad" name="intensidad_propuesta" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg py-3 px-4">
+                    <option value="baja" selected>Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
                 </select>
-                @error('intensidad_actual')
-                    <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
-                @enderror
             </div>
 
+            <!-- Description -->
             <div>
-                <label class="block text-sm font-medium mb-1" for="description">Descripción</label>
-                <textarea id="description" name="description" rows="5" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" required>{{ old('description') }}</textarea>
-                @error('description')
-                    <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
-                @enderror
+                <label for="description" class="block text-sm font-medium text-gray-700">Descripción (obligatorio)</label>
+                <textarea id="description" name="description" rows="4" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"></textarea>
             </div>
 
-            <div class="flex items-center justify-end gap-3 pt-2">
-                <button type="submit" class="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2">
-                    Crear
-                </button>
+            <!-- Foto -->
+            <div>
+                <label for="foto" class="block text-sm font-medium text-gray-700">Foto de Evidencia (opcional)</label>
+                <input id="foto" name="foto" type="file" accept="image/*" class="mt-1 block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100">
             </div>
-            </form>
+
+            <button type="submit" id="btnSubmit" disabled class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-50">
+                Enviar Reporte
+            </button>
+        </form>
+
+        <div id="successMessage" class="mt-4 p-4 bg-green-100 text-green-800 rounded-md hidden">
+            Reporte creado exitosamente.
         </div>
+        <div id="errorMessage" class="mt-4 p-4 bg-red-100 text-red-800 rounded-md hidden"></div>
     </div>
+</div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const latInput = document.getElementById('latitud');
-            const lngInput = document.getElementById('longitud');
-            const locStatus = document.getElementById('locationStatus');
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
-            let santaCruzPolygon = null;
-            let provincesData = null;
-            let municipalitiesData = null;
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let map, marker, circle;
+    let gpsLat, gpsLng;
+    let reportLat, reportLng;
+    
+    const citizenCarnet = "{{ session('api_user')['carnet'] ?? '' }}";
 
-            fetch('/santacruz_boundary.json')
-                .then(res => res.json())
-                .then(geoJson => {
-                    santaCruzPolygon = geoJson;
-                });
-            fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
-            fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+    let santaCruzPolygon = null;
+    let provincesData = null;
+    let municipalitiesData = null;
 
-            function fetchLocation() {
-                if (!navigator.geolocation) {
-                    locStatus.textContent = "Tu navegador no soporta geolocalización.";
-                    locStatus.classList.replace('text-gray-600', 'text-red-600');
-                    enableInputs();
-                    return;
-                }
+    fetch('/santacruz_boundary.json').then(res => res.json()).then(geoJson => santaCruzPolygon = geoJson);
+    fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
+    fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
 
-                locStatus.textContent = "Obteniendo ubicación...";
-                locStatus.className = "text-sm text-gray-600";
-                
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    let foundProv = null;
-                    let foundMuni = null;
-                    
-                    if (santaCruzPolygon && typeof turf !== 'undefined') {
-                        const pt = turf.point([lng, lat]);
-                        if (!turf.booleanPointInPolygon(pt, santaCruzPolygon)) {
-                            locStatus.textContent = "Estás fuera de Santa Cruz. Por favor, selecciona una ubicación dentro del departamento.";
-                            locStatus.classList.replace('text-gray-600', 'text-red-600');
-                            enableInputs();
-                            return;
-                        }
+    function makeReadonlyDisplay(id) {
+        const sel = document.getElementById(id);
+        if (!sel) return;
 
-                        if (provincesData && municipalitiesData) {
-                            for (let feature of provincesData.features) {
-                                if (turf.booleanPointInPolygon(pt, feature)) {
-                                    foundProv = feature.properties.name;
-                                    break;
-                                }
-                            }
-                            for (let feature of municipalitiesData.features) {
-                                if (turf.booleanPointInPolygon(pt, feature)) {
-                                    foundMuni = feature.properties.name;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    latInput.value = lat;
-                    lngInput.value = lng;
-                    locStatus.textContent = "Ubicación obtenida exitosamente dentro de Santa Cruz.";
-                    locStatus.classList.replace('text-gray-600', 'text-green-600');
+        const display = document.createElement('div');
+        display.id    = id + '_display';
+        display.className = 'w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 min-h-[38px] break-words flex items-center mt-1';
+        display.textContent = sel.options[sel.selectedIndex]?.text || sel.value || '—';
+        
+        sel.parentNode.insertBefore(display, sel);
+        sel.style.display = 'none';
 
-                    if (foundProv) {
-                        const provSelect = document.getElementById('form_provincia');
-                        if (provSelect) {
-                            provSelect.value = foundProv;
-                            provSelect.dispatchEvent(new Event('change'));
-                            
-                            if (foundMuni) {
-                                setTimeout(() => {
-                                    const munSelect = document.getElementById('form_municipio');
-                                    if (munSelect) {
-                                        munSelect.value = foundMuni;
-                                        munSelect.dispatchEvent(new Event('change'));
-                                    }
-                                }, 100);
-                            }
-                        }
-                    }
-                }, function(error) {
-                    locStatus.textContent = "Error al obtener ubicación. Puedes ingresarla manualmente (asegúrate de que sea en Santa Cruz).";
-                    locStatus.classList.replace('text-gray-600', 'text-red-600');
-                    enableInputs();
-                }, {
-                    enableHighAccuracy: true,
-                    timeout: 10000
-                });
+        sel.addEventListener('change', function () {
+            let text = this.value;
+            for(let opt of this.options) {
+                if(opt.value === this.value) { text = opt.text; break; }
             }
-
-            function enableInputs() {
-                latInput.removeAttribute('readonly');
-                latInput.classList.replace('bg-gray-50', 'bg-white');
-                lngInput.removeAttribute('readonly');
-                lngInput.classList.replace('bg-gray-50', 'bg-white');
-            }
-
-            if (!latInput.value || !lngInput.value) {
-                fetchLocation();
-            }
+            display.textContent = text || '—';
         });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    }
+
+    setTimeout(() => {
+        makeReadonlyDisplay('form_provincia');
+        makeReadonlyDisplay('form_municipio');
+    }, 100);
+
+    function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = deg2rad(lat2-lat1);
+        const dLon = deg2rad(lon2-lon1); 
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2); 
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        return R * c; 
+    }
+    function deg2rad(deg) { return deg * (Math.PI/180); }
+
+    function initMap(lat, lng) {
+        if (!map) {
+            map = L.map('map').setView([lat, lng], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            circle = L.circle([lat, lng], {
+                color: 'blue',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.1,
+                radius: 500
+            }).addTo(map);
+
+            marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+            
+            marker.on('drag', function(e) {
+                const pos = marker.getLatLng();
+                const dist = getDistanceFromLatLonInM(gpsLat, gpsLng, pos.lat, pos.lng);
+                
+                const btn = document.getElementById('btnSubmit');
+                const warn = document.getElementById('distanceWarning');
+                
+                if (dist > 500) {
+                    btn.disabled = true;
+                    warn.classList.remove('hidden');
+                } else {
+                    btn.disabled = false;
+                    warn.classList.add('hidden');
+                    reportLat = pos.lat;
+                    reportLng = pos.lng;
+                    updateLocationText(reportLat, reportLng);
+                }
+            });
+        } else {
+            map.setView([lat, lng], 16);
+            circle.setLatLng([gpsLat, gpsLng]);
+            marker.setLatLng([reportLat, reportLng]);
+        }
+    }
+
+    function updateLocationText(lat, lng) {
+        if (santaCruzPolygon && typeof turf !== 'undefined') {
+            const pt = turf.point([lng, lat]);
+            if (!turf.booleanPointInPolygon(pt, santaCruzPolygon)) {
+                return;
+            }
+
+            let foundProv = null;
+            let foundMuni = null;
+
+            if (provincesData && municipalitiesData) {
+                for (let feature of provincesData.features) {
+                    if (turf.booleanPointInPolygon(pt, feature)) {
+                        foundProv = window.normalizeProvName ? window.normalizeProvName(feature.properties.name) : feature.properties.name;
+                        break;
+                    }
+                }
+                for (let feature of municipalitiesData.features) {
+                    if (turf.booleanPointInPolygon(pt, feature)) {
+                        foundMuni = window.normalizeMuniName ? window.normalizeMuniName(feature.properties.name) : feature.properties.name;
+                        break;
+                    }
+                }
+            }
+
+            if (foundProv) {
+                const provSelect = document.getElementById('form_provincia');
+                if (provSelect) {
+                    for (let opt of provSelect.options) {
+                        if (opt.value && opt.value.toLowerCase() === foundProv.toLowerCase()) {
+                            provSelect.value = opt.value;
+                            break;
+                        }
+                    }
+                    provSelect.dispatchEvent(new Event('change'));
+                    
+                    if (foundMuni) {
+                        setTimeout(() => {
+                            const munSelect = document.getElementById('form_municipio');
+                            if (munSelect) {
+                                for (let opt of munSelect.options) {
+                                    if (opt.value && opt.value.toLowerCase() === foundMuni.toLowerCase()) {
+                                        munSelect.value = opt.value;
+                                        break;
+                                    }
+                                }
+                                munSelect.dispatchEvent(new Event('change'));
+                            }
+                        }, 100);
+                    }
+                }
+            }
+        }
+    }
+
+    function getLocation() {
+        const status = document.getElementById('gpsStatus');
+        status.textContent = 'Obteniendo ubicación...';
+        status.className = 'text-sm text-yellow-600';
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    gpsLat = pos.coords.latitude;
+                    gpsLng = pos.coords.longitude;
+                    reportLat = gpsLat;
+                    reportLng = gpsLng;
+                    
+                    status.textContent = 'Ubicación GPS obtenida correctamente';
+                    status.className = 'text-sm text-green-600';
+                    document.getElementById('btnSubmit').disabled = false;
+                    
+                    initMap(gpsLat, gpsLng);
+                    updateLocationText(gpsLat, gpsLng);
+                },
+                (err) => {
+                    status.textContent = 'Error al obtener GPS. Activa los permisos.';
+                    status.className = 'text-sm text-red-600';
+                },
+                { enableHighAccuracy: true }
+            );
+        }
+    }
+
+    document.getElementById('btnGetLocation').addEventListener('click', getLocation);
+    getLocation();
+
+    document.getElementById('detailedReportForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+        
+        document.getElementById('errorMessage').classList.add('hidden');
+        document.getElementById('successMessage').classList.add('hidden');
+
+        const formData = new FormData();
+        formData.append('citizen_carnet', citizenCarnet);
+        formData.append('lat_gps', gpsLat);
+        formData.append('long_gps', gpsLng);
+        formData.append('lat_reporte', reportLat);
+        formData.append('long_reporte', reportLng);
+        formData.append('intensidad_propuesta', document.getElementById('intensidad').value);
+        
+        const address = document.getElementById('address').value;
+        if(address) formData.append('address', address);
+        
+        const description = document.getElementById('description').value;
+        if(description) formData.append('description', description);
+        
+        const fotoInput = document.getElementById('foto');
+        if(fotoInput.files.length > 0) {
+            formData.append('foto', fotoInput.files[0]);
+        }
+        
+        try {
+            const response = await fetch('/api/reportes', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                document.getElementById('successMessage').classList.remove('hidden');
+                setTimeout(() => {
+                    window.location.href = '/reports';
+                }, 2000);
+            } else {
+                document.getElementById('errorMessage').textContent = 'Error: ' + (result.message || 'Error desconocido');
+                document.getElementById('errorMessage').classList.remove('hidden');
+                btn.disabled = false;
+            }
+        } catch (err) {
+            document.getElementById('errorMessage').textContent = 'Error de conexión';
+            document.getElementById('errorMessage').classList.remove('hidden');
+            btn.disabled = false;
+        }
+        btn.textContent = 'Enviar Reporte';
+    });
+});
+</script>
 @endsection

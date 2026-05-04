@@ -12,6 +12,16 @@
                     <span id="gpsStatus" class="text-sm text-yellow-600">Obteniendo ubicación...</span>
                     <button type="button" id="btnGetLocation" class="text-sm text-blue-600 hover:text-blue-800">Actualizar GPS</button>
                 </div>
+                
+                <div id="nearbyAnnouncement" class="mt-3 p-3 bg-blue-50 text-blue-800 rounded-md hidden border border-blue-200">
+                    <p id="nearbyText" class="text-sm font-medium"></p>
+                    <div class="mt-2 text-sm">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="chkReportClosest" class="rounded text-blue-600 focus:ring-blue-500" checked>
+                            <span>Sí, quiero reportar y actualizar esta inundación cercana</span>
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div>
@@ -23,8 +33,8 @@
             <div>
                 <label for="intensidad" class="block text-sm font-medium text-gray-700">Intensidad Propuesta</label>
                 <select id="intensidad" name="intensidad_propuesta" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                    <option value="baja">Baja</option>
-                    <option value="media" selected>Media</option>
+                    <option value="baja" selected>Baja</option>
+                    <option value="media">Media</option>
                     <option value="alta">Alta</option>
                 </select>
             </div>
@@ -48,6 +58,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let map, marker, circle;
     let gpsLat, gpsLng;
     let reportLat, reportLng;
+    const activas = @json($inundacionesActivas ?? []);
+    let closestFlood = null;
     
     // UUID Generation or Retrieval
     function getUUID() {
@@ -126,14 +138,64 @@ document.addEventListener('DOMContentLoaded', function() {
                 (pos) => {
                     gpsLat = pos.coords.latitude;
                     gpsLng = pos.coords.longitude;
-                    reportLat = gpsLat;
-                    reportLng = gpsLng;
+                    
+                    let closestDist = Infinity;
+                    let nearbyCount = 0;
+                    
+                    activas.forEach(f => {
+                        const d = getDistanceFromLatLonInM(gpsLat, gpsLng, f.latitud, f.longitud);
+                        if (d <= 1000) nearbyCount++;
+                        if (d < closestDist) {
+                            closestDist = d;
+                            closestFlood = f;
+                        }
+                    });
+                    
+                    const ann = document.getElementById('nearbyAnnouncement');
+                    const txt = document.getElementById('nearbyText');
+                    const chk = document.getElementById('chkReportClosest');
+                    const intSelect = document.getElementById('intensidad');
+                    
+                    if (closestFlood && closestDist <= 500) {
+                        ann.classList.remove('hidden');
+                        txt.textContent = `Hemos encontrado ${nearbyCount} inundación(es) activa(s) cerca. La más cercana está a ${Math.round(closestDist)}m. El marcador se ha centrado allí automáticamente para actualizarla.`;
+                        
+                        reportLat = parseFloat(closestFlood.latitud);
+                        reportLng = parseFloat(closestFlood.longitud);
+                        
+                        intSelect.value = closestFlood.intensidad_actual || 'baja';
+                        chk.checked = true;
+                        
+                        chk.onchange = function() {
+                            if (this.checked) {
+                                reportLat = parseFloat(closestFlood.latitud);
+                                reportLng = parseFloat(closestFlood.longitud);
+                                intSelect.value = closestFlood.intensidad_actual || 'baja';
+                            } else {
+                                reportLat = gpsLat;
+                                reportLng = gpsLng;
+                                intSelect.value = 'baja';
+                            }
+                            if (marker && map) {
+                                marker.setLatLng([reportLat, reportLng]);
+                                map.setView([reportLat, reportLng]);
+                            }
+                        };
+                    } else {
+                        ann.classList.add('hidden');
+                        reportLat = gpsLat;
+                        reportLng = gpsLng;
+                        intSelect.value = 'baja';
+                    }
                     
                     status.textContent = 'Ubicación GPS obtenida correctamente';
                     status.className = 'text-sm text-green-600';
                     document.getElementById('btnSubmit').disabled = false;
                     
-                    initMap(gpsLat, gpsLng);
+                    initMap(reportLat, reportLng);
+                    
+                    // Asegurarnos de que el círculo muestre el rango desde el GPS real
+                    if (circle) circle.setLatLng([gpsLat, gpsLng]);
                 },
                 (err) => {
                     status.textContent = 'Error al obtener GPS. Activa los permisos.';

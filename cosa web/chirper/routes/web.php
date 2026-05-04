@@ -25,7 +25,10 @@ Route::middleware(RedirectIfApiAuthenticated::class)->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::get('/reporte-rapido', function () { return view('reports.rapido'); })->name('reports.rapido');
+Route::get('/reporte-rapido', function () { 
+    $activas = \App\Models\Inundacion::where('estado', 'activa')->get(['id', 'latitud', 'longitud', 'intensidad_actual']);
+    return view('reports.rapido', ['inundacionesActivas' => $activas]); 
+})->name('reports.rapido');
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/maps', [MapController::class, 'index'])->name('maps.index');

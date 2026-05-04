@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class FloodReportResource extends JsonResource
+class InundacionResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -14,12 +14,12 @@ class FloodReportResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'latitude' => $this->latitude,
-            'longitude' => $this->longitude,
+            'latitud' => $this->latitud,
+            'longitud' => $this->longitud,
             'address' => $this->address,
             'description' => $this->description,
-            'severity' => $this->severity,
-            'status' => $this->status,
+            'intensidad_actual' => $this->intensidad_actual,
+            'estado' => $this->estado,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'citizen' => new UserResource($this->whenLoaded('citizen')),

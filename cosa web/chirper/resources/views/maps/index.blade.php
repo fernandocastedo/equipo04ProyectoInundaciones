@@ -31,6 +31,14 @@
 
 <script>
     window.floodReports = @json($reports);
+    window.pendingReports = [];
+    
+    fetch('/api/reportes/pendientes')
+        .then(res => res.json())
+        .then(data => {
+            window.pendingReports = data;
+            renderPendingReports(data);
+        });
     
     function initMap() { 
         const defaultLocation = [-17.783325, -63.182111]; // Centro de Santa Cruz de la Sierra, Bolivia 
@@ -38,8 +46,8 @@
         let centerLoc = defaultLocation;
         if (window.floodReports.length > 0) {
             for(let i=0; i<window.floodReports.length; i++) {
-                 let lat = parseFloat(window.floodReports[i].latitude);
-                 let lng = parseFloat(window.floodReports[i].longitude);
+                 let lat = parseFloat(window.floodReports[i].latitud);
+                 let lng = parseFloat(window.floodReports[i].longitud);
                  if(!isNaN(lat) && !isNaN(lng)) {
                      centerLoc = [lat, lng];
                      break;
@@ -48,7 +56,7 @@
         }
 
         // 1. Inicializar Mapa de Leaflet
-        const map = L.map('map').setView(centerLoc, 12);
+        const map = L.map('map').setView(centerLoc, 12); window.mapObj = map;
 
         // 2. Cargar Capa de OpenStreetMap (Gratuita)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -60,15 +68,15 @@
         function renderReports(reportsData) {
             markersLayer.clearLayers();
             reportsData.forEach(report => {
-                const lat = parseFloat(report.latitude);
-                const lng = parseFloat(report.longitude);
+                const lat = parseFloat(report.latitud);
+                const lng = parseFloat(report.longitud);
 
                 if (isNaN(lat) || isNaN(lng)) return;
 
                 let markerColor = "#4285F4"; // Default Blue
-                if (report.severity === 'high') markerColor = "#EA4335"; // Red
-                if (report.severity === 'medium') markerColor = "#FBBC05"; // Yellow
-                if (report.severity === 'low') markerColor = "#34A853"; // Green
+                if (report.intensidad_actual === 'high') markerColor = "#EA4335"; // Red
+                if (report.intensidad_actual === 'medium') markerColor = "#FBBC05"; // Yellow
+                if (report.intensidad_actual === 'low') markerColor = "#34A853"; // Green
 
                 const customIcon = L.divIcon({
                     className: 'custom-leaflet-marker',
@@ -80,8 +88,8 @@
                 const contentStr = `
                     <div class="max-w-xs">
                         <p class="font-semibold text-sm mb-1">${report.description.substring(0, 100) + (report.description.length > 100 ? '...' : '')}</p>
-                        <p class="text-xs text-gray-600 mb-2"><b>Severidad:</b> ${report.severity} | <b>Estado:</b> ${report.status}</p>
-                        <a href="/reports/${report.id}" class="text-xs text-blue-600 hover:underline">Ver detalle completo →</a>
+                        <p class="text-xs text-gray-600 mb-2"><b>Severidad:</b> ${report.intensidad_actual} | <b>Estado:</b> ${report.estado}</p>
+                        <a href="/reports/${report.id}" class="text-xs text-blue-600 hover:underline">Ver detalle completo ?</a>
                     </div>
                 `;
                 
@@ -98,13 +106,13 @@
         // 3. Pintar Reportes
         renderReports(window.floodReports);
 
-        // ─────────────────────────────────────────────────────────────
-        // Cargar geometrías GeoJSON para resaltado de fronteras.
-        // NOTA: A diferencia de logistics/index, aquí NO hay clic para registrar;
+        // -------------------------------------------------------------
+        // Cargar geometr�as GeoJSON para resaltado de fronteras.
+        // NOTA: A diferencia de logistics/index, aqu� NO hay clic para registrar;
         // estos datos solo se usan para el resaltado visual del filtro.
-        // Las funciones de traducción (normalizeProvName, normalizeMuniName) están
+        // Las funciones de traducci�n (normalizeProvName, normalizeMuniName) est�n
         // definidas globalmente en layouts/app.blade.php y disponibles en toda la app.
-        // ─────────────────────────────────────────────────────────────
+        // -------------------------------------------------------------
         let provincesData = null;
         let municipalitiesData = null;
         let highlightLayer = null; // Capa activa de resaltado (naranja=provincia, rojo=municipio)
@@ -112,11 +120,11 @@
         fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
         fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
 
-        // ─────────────────────────────────────────────────────────────
+        // -------------------------------------------------------------
         // EVENTO CENTRAL DE FILTRADO: locationFilterChanged
-        // ─────────────────────────────────────────────────────────────
-        // Igual al de logistics, pero más simple: solo filtra los marcadores
-        // de reportes y actualiza la capa de resaltado geográfico.
+        // -------------------------------------------------------------
+        // Igual al de logistics, pero m�s simple: solo filtra los marcadores
+        // de reportes y actualiza la capa de resaltado geogr�fico.
         // No hay filtro de "Estado" (abierto/cerrado) porque es de centros de acopio.
         window.addEventListener('locationFilterChanged', function(e) {
             const { idPrefix, provincia, municipio } = e.detail;
@@ -124,8 +132,8 @@
             // Filtrado local SPA para reportes de inundación
             if (idPrefix === 'filter') {
                 const filtered = window.floodReports.filter(r => {
-                    // Si el backend no envió provincia, no podemos filtrar perfecto localmente,
-                    // pero asumiendo que FloodReport Resource sí lo expone:
+                    // Si el backend no envi� provincia, no podemos filtrar perfecto localmente,
+                    // pero asumiendo que FloodReport Resource s� lo expone:
                     if (provincia && r.provincia && r.provincia !== provincia) return false;
                     if (municipio && r.municipio && r.municipio !== municipio) return false;
                     return true;
@@ -139,7 +147,7 @@
             }
 
             if (municipio && municipalitiesData) {
-                // Buscar el polígono del municipio seleccionado (rojo #EF4444)
+                // Buscar el pol�gono del municipio seleccionado (rojo #EF4444)
                 // normalizeMuniName traduce el nombre crudo del GeoJSON ("Municipio Warnes")
                 // al formato oficial limpio ("warnes") para compararlo con el valor del filtro.
                 const feature = municipalitiesData.features.find(f => window.normalizeMuniName(f.properties.name) === municipio.toLowerCase());
@@ -151,8 +159,8 @@
                     map.fitBounds(highlightLayer.getBounds());
                 }
             } else if (provincia && provincesData) {
-                // Buscar el polígono de la provincia seleccionada (naranja #F97316)
-                // normalizeProvName maneja aliases como "Velasco" → "José Miguel de Velasco"
+                // Buscar el pol�gono de la provincia seleccionada (naranja #F97316)
+                // normalizeProvName maneja aliases como "Velasco" ? "Jos� Miguel de Velasco"
                 const feature = provincesData.features.find(f => window.normalizeProvName(f.properties.name) === provincia.toLowerCase());
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
@@ -175,3 +183,4 @@
     }
 </script>
 @endsection
+<script>window.renderPendingReports = function(pendingData) { pendingData.forEach(report => { const lat = parseFloat(report.lat_reporte); const lng = parseFloat(report.long_reporte); if (isNaN(lat) || isNaN(lng)) return; const customIcon = L.divIcon({ className: 'custom-leaflet-marker', html: '<div style="background-color: #F59E0B; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5); animation: pulse 2s infinite;"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }); const contentStr = '<div class="max-w-xs"><p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente</p><p class="text-xs text-gray-600 mb-2"><b>Intensidad Propuesta:</b> ' + report.intensidad_propuesta + '</p><div class="flex flex-col space-y-2 mt-2"><button onclick="validateReport(' + report.id + ', ''vincular'');" class="bg-blue-500 text-white px-2 py-1 text-xs rounded">Vincular a Cercana</button><button onclick="validateReport(' + report.id + ', ''crear'');" class="bg-green-500 text-white px-2 py-1 text-xs rounded">Crear Nueva</button><button onclick="validateReport(' + report.id + ', ''rechazar'');" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Rechazar</button></div></div>'; const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(contentStr, { minWidth: 200 }); window.mapObj.addLayer(marker); }); }; window.validateReport = function(id, action) { let body = { action: action }; if (action === 'vincular') { const inundación_id = prompt('Ingrese el ID de la inundación a la que desea vincular:'); if (!inundación_id) return; body.inundación_id = inundación_id; } fetch('/api/reportes/' + id + '/validar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer {{ session('api_token') }}' }, body: JSON.stringify(body) }).then(res => res.json()).then(data => { alert(data.message); location.reload(); }); };</script>

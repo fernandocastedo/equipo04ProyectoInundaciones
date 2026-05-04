@@ -7,25 +7,31 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class FloodReport extends Model
+class Inundacion extends Model
 {
     use HasFactory;
 
+    protected $table = 'inundaciones';
+
     protected $fillable = [
         'citizen_carnet',
-        'latitude',
-        'longitude',
+        'latitud',
+        'longitud',
         'provincia',
         'municipio',
         'address',
         'description',
-        'severity',
-        'status',
+        'intensidad_actual',
+        'estado',
+        'municipio_id',
+        'puntos_quorum',
+        'expira_at',
     ];
 
     protected $casts = [
-        'latitude' => 'decimal:7',
-        'longitude' => 'decimal:7',
+        'latitud' => 'decimal:7',
+        'longitud' => 'decimal:7',
+        'expira_at' => 'datetime',
     ];
 
     public function citizen(): BelongsTo
@@ -33,8 +39,9 @@ class FloodReport extends Model
         return $this->belongsTo(User::class, foreignKey: 'citizen_carnet', ownerKey: 'carnet');
     }
 
-    public function responses(): HasMany
+
+    public function reportes(): HasMany
     {
-        return $this->hasMany(AuthorityResponse::class);
+        return $this->hasMany(Reporte::class, 'inundacion_id');
     }
 }

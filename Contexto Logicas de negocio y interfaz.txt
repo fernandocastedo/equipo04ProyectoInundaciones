@@ -1,0 +1,41 @@
+El objetivo es un "Módulo de Reportes Rápidos" que permita a ciudadanos reportar incidentes con un solo toque y a las autoridades validar y consolidar estos datos.
+Requerimientos de Lógica de Negocio:
+1.- Persistencia y Filtrado (UUID):
+- Generar un UUID en localStorage para identificar al navegador del ciudadano.
+- Un usuario no puede crear múltiples reportes para la misma zona; si vuelve a entrar, debe poder "Actualizar" su reporte previo.
+2.- Ubicación Híbrida (Regla de los 500m):
+- El sistema captura el GPS real (lat_gps), pero permite al usuario mover el marcador en el mapa hasta un máximo de 500 metros para señalar el epicentro real (lat_reporte).
+- Backend: Validar que la distancia entre coordenadas GPS y Reporte no exceda los 500m mediante la fórmula de Haversine.
+3.- Integración con Open-Meteo (Predicción):
+- Al recibir un reporte, consultar la API de Open-Meteo para obtener precipitation (mm/h).
+- Guardar este dato en reportes.datos_clima_json para análisis de la autoridad.
+4.- Sistema de Validación y Sugerencia de Fusión:
+- En el panel de autoridad, los reportes aparecen como "Pendientes".
+- Sugerencia: Si un reporte está a <= 300m de una inundacion activa, sugerir "Vincular". Si es > = 300metros, sugerir "Crear Nueva".
+- Al aprobar y vincular, se suman Puntos de Quórum a la inundación (Baja=1, Media=3, Alta=5).
+- Escalamiento: La intensidad_actual de la inundación sube a "Media" con 6 puntos y a "Alta" con 15 puntos.
+5.- Ciclo de Vida y Expiración Dinámica (Scheduler):
+Implementar un Task Scheduler de Laravel que se ejecute cada 15 o 30 minutos para gestionar el estado de las inundaciones activas bajo la siguiente lógica:
+5.1 Tiempos Base de Vida:
+Al crearse o actualizarse una inundacion, se define un expira_at inicial según la intensidad:
+- Baja: +5 horas.
+- Media: +18 horas.
+- Alta: +7 días.
+5.2 Lógica del Factor de Persistencia (Extensión por Lluvia):
+Antes de permitir que una inundación expire, el sistema debe consultar la tabla clima_cache (u Open-Meteo directamente). Si se detecta precipitación activa (mm/h), se debe extender el expira_at de forma proporcional a la intensidad del volumen de agua:
+
+ < 2 mm/h: +30 min.
+ 2 - 10 mm/h: +1 hora.
+ 10 - 30 mm/h: +3 horas.
+  > 30 mm/h: +6 horas.
+
+5.3 Reglas de Finalización (El "Vaciado"):
+Una inundación solo cambiará su estado a "finalizada" si se cumplen estas tres condiciones en conjunto:
+- CURRENT_TIMESTAMP es mayor que expira_at.
+- La API de Clima reporta (0mm/h) de precipitación (no está lloviendo).
+- No se han recibido ni aprobado nuevos reportes ciudadanos para esa inundación en la última hora.
+5.4 Persistencia Post-Lluvia:
+Si la lluvia se detiene (0mm/h) el sistema no debe cerrar la inundación inmediatamente. Debe permitir que el tiempo base (las horas restantes del expira_at) siga corriendo para simular el tiempo que tarda el sistema de drenaje de la ciudad en evacuar el agua estancada.
+
+6.- Interfaz de Autoridad:
+Crear una vista de "Validación" que muestre un mapa con el punto del reporte (amarillo) y las inundaciones cercanas (rojas) para facilitar la decisión de fusión (Merge).

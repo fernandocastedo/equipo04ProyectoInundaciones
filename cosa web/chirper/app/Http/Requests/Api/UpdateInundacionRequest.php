@@ -5,7 +5,7 @@ namespace App\Http\Requests\Api;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateFloodReportRequest extends FormRequest
+class UpdateInundacionRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
@@ -28,17 +28,17 @@ class UpdateFloodReportRequest extends FormRequest
     public function rules(): array
     {
         $baseRules = [
-            'latitude' => ['sometimes', 'numeric', 'between:-90,90'],
-            'longitude' => ['sometimes', 'numeric', 'between:-180,180'],
+            'latitud' => ['sometimes', 'numeric', 'between:-90,90'],
+            'longitud' => ['sometimes', 'numeric', 'between:-180,180'],
             'provincia' => ['sometimes', 'string', 'max:255'],
             'municipio' => ['sometimes', 'string', 'max:255'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'string'],
-            'severity' => ['sometimes', 'string', 'in:low,medium,high'],
+            'intensidad_actual' => ['sometimes', 'string', 'in:baja,media,alta'],
         ];
 
         if ($this->user()?->isAuthority()) {
-            $baseRules['status'] = ['sometimes', 'string', 'in:open,in_progress,resolved,closed,false_report'];
+            $baseRules['estado'] = ['sometimes', 'string', 'in:activa,finalizada,falso_reporte'];
         }
 
         return $baseRules;

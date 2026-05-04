@@ -25,6 +25,7 @@ Route::middleware(RedirectIfApiAuthenticated::class)->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+Route::get('/reporte-rapido', function () { return view('reports.rapido'); })->name('reports.rapido');
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/maps', [MapController::class, 'index'])->name('maps.index');

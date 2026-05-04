@@ -3,9 +3,9 @@
 namespace App\Providers;
 
 use App\Models\AuthorityResponse;
-use App\Models\FloodReport;
+use App\Models\Inundacion;
 use App\Policies\AuthorityResponsePolicy;
-use App\Policies\FloodReportPolicy;
+use App\Policies\InundacionPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider
@@ -16,7 +16,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        FloodReport::class => FloodReportPolicy::class,
+        Inundacion::class => InundacionPolicy::class,
         AuthorityResponse::class => AuthorityResponsePolicy::class,
     ];
 

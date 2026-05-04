@@ -4,7 +4,7 @@ namespace App\Http\Requests\Api;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreFloodReportRequest extends FormRequest
+class StoreInundacionRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
@@ -27,13 +27,13 @@ class StoreFloodReportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'latitud' => ['required', 'numeric', 'between:-90,90'],
+            'longitud' => ['required', 'numeric', 'between:-180,180'],
             'provincia' => ['required', 'string', 'max:255'],
             'municipio' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'severity' => ['required', 'string', 'in:low,medium,high'],
+            'intensidad_actual' => ['required', 'string', 'in:baja,media,alta'],
         ];
     }
 }

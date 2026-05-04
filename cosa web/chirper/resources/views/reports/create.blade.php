@@ -16,22 +16,23 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1" for="latitude">Latitude</label>
-                    <input id="latitude" name="latitude" type="number" step="any" value="{{ old('latitude') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
-                    @error('latitude')
+                    <label class="block text-sm font-medium mb-1" for="latitud">Latitud</label>
+                    <input id="latitud" name="latitud" type="number" step="any" value="{{ old('latitud') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
+                    @error('latitud')
                         <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
                     @enderror
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium mb-1" for="longitude">Longitude</label>
-                    <input id="longitude" name="longitude" type="number" step="any" value="{{ old('longitude') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
-                    @error('longitude')
+                    <label class="block text-sm font-medium mb-1" for="longitud">Longitud</label>
+                    <input id="longitud" name="longitud" type="number" step="any" value="{{ old('longitud') }}" class="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" readonly required>
+                    @error('longitud')
                         <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
                     @enderror
                 </div>
             </div>
-            <div class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
+            <div class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200 pointer-events-none opacity-70">
+                <p class="text-xs text-gray-500 mb-2">Calculado automáticamente:</p>
                 <x-location-filter idPrefix="form" />
             </div>
 
@@ -48,14 +49,14 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-1" for="severity">Severidad</label>
-                <select id="severity" name="severity" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" required>
-                    @php($sev = old('severity', 'medium'))
-                    <option value="low" @selected($sev === 'low')>low</option>
-                    <option value="medium" @selected($sev === 'medium')>medium</option>
-                    <option value="high" @selected($sev === 'high')>high</option>
+                <label class="block text-sm font-medium mb-1" for="intensidad_actual">Intensidad</label>
+                <select id="intensidad_actual" name="intensidad_actual" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:ring-1 focus:ring-gray-900" required>
+                    @php($sev = old('intensidad_actual', 'baja'))
+                    <option value="baja" @selected($sev === 'baja')>Baja</option>
+                    <option value="media" @selected($sev === 'media')>Media</option>
+                    <option value="alta" @selected($sev === 'alta')>Alta</option>
                 </select>
-                @error('severity')
+                @error('intensidad_actual')
                     <div class="text-sm text-red-700 mt-1">{{ $message }}</div>
                 @enderror
             </div>
@@ -79,8 +80,8 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            const latInput = document.getElementById('latitude');
-            const lngInput = document.getElementById('longitude');
+            const latInput = document.getElementById('latitud');
+            const lngInput = document.getElementById('longitud');
             const locStatus = document.getElementById('locationStatus');
 
             let santaCruzPolygon = null;

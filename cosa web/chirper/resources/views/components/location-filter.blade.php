@@ -7,7 +7,7 @@
     'selectedMunicipio' => request('municipio'),
     'showEstado' => false,
     'showSearch' => false,
-    'resetBelow' => false,  {{-- Si true: botón Restablecer debajo de los selects --}}
+    'resetBelow' => false,
 ])
 
 <div class="location-filter-container w-full">

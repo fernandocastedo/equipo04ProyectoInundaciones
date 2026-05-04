@@ -2,12 +2,12 @@
 
 namespace App\Policies;
 
-use App\Models\FloodReport;
+use App\Models\Inundacion;
 use App\Models\User;
 
-class FloodReportPolicy
+class InundacionPolicy
 {
-    public function view(User $user, FloodReport $report): bool
+    public function view(User $user, Inundacion $report): bool
     {
         return $user->isAuthority() || $report->citizen_carnet === $user->carnet;
     }
@@ -17,7 +17,7 @@ class FloodReportPolicy
         return $user->isCitizen() && ! $user->isBanned();
     }
 
-    public function update(User $user, FloodReport $report): bool
+    public function update(User $user, Inundacion $report): bool
     {
         if ($user->isAuthority()) {
             return true;

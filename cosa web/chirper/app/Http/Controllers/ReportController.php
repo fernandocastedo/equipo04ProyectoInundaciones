@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\FloodReport;
+use App\Models\Inundacion;
 use App\Services\FloodApiClient;
 use App\Services\FloodApiExceptions\ApiRequestException;
 use App\Services\FloodApiExceptions\ApiUnauthorizedException;
@@ -29,21 +29,48 @@ final class ReportController
         $carnet = (string) ($user['carnet'] ?? '');
         $page = max(1, (int) $request->query('page', '1'));
 
-        $query = FloodReport::query()->latest();
+        $query = Inundacion::query()->latest();
 
         if ($role !== 'authority' && $carnet !== '') {
             $query->where('citizen_carnet', $carnet);
         }
 
-        $reports = $query->paginate(15, ['*'], 'page', $page);
+        $reports = $query->with('reportes')->paginate(15, ['*'], 'page', $page);
+
+        $reportesPendientes = [];
+        if ($role === 'authority') {
+            $reportesPendientes = \App\Models\Reporte::whereNull('inundacion_id')->latest()->get();
+            $activas = \App\Models\Inundacion::where('estado', 'activa')->get();
+
+            foreach ($reportesPendientes as $rep) {
+                $cercanas = [];
+                foreach ($activas as $activa) {
+                    $lat1 = deg2rad((float)$rep->lat_gps);
+                    $lon1 = deg2rad((float)$rep->long_gps);
+                    $lat2 = deg2rad((float)$activa->latitud);
+                    $lon2 = deg2rad((float)$activa->longitud);
+                    $dLat = $lat2 - $lat1;
+                    $dLon = $lon2 - $lon1;
+                    $a = sin($dLat/2) * sin($dLat/2) + cos($lat1) * cos($lat2) * sin($dLon/2) * sin($dLon/2);
+                    $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+                    $dist = 6371000 * $c;
+
+                    if ($dist <= 300) {
+                        $cercanas[] = $activa;
+                    }
+                }
+                $rep->cercanas = collect($cercanas);
+            }
+        }
 
         return view('reports.index', [
             'reports' => $reports->items(),
+            'reportesPendientes' => $reportesPendientes,
             'meta' => [
                 'current_page' => $reports->currentPage(),
                 'last_page' => $reports->lastPage(),
             ],
-            'error' => null,
+            'role' => $role,
         ]);
     }
 
@@ -57,11 +84,11 @@ final class ReportController
         $token = (string) $request->session()->get('api_token', '');
 
         $data = $request->validate([
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'latitud' => ['required', 'numeric', 'between:-90,90'],
+            'longitud' => ['required', 'numeric', 'between:-180,180'],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'severity' => ['required', 'string', 'in:low,medium,high'],
+            'intensidad_actual' => ['required', 'string', 'in:low,medium,high'],
         ]);
 
         try {
@@ -94,7 +121,7 @@ final class ReportController
             $request->session()->forget(['api_token', 'api_user']);
             return redirect()->route('login');
         } catch (ApiRequestException $e) {
-            abort($e->status, $e->getMessage());
+            abort($e->estado, $e->getMessage());
         }
 
         return view('reports.show', [
@@ -126,12 +153,12 @@ final class ReportController
         return redirect()->route('reports.show', ['id' => $id]);
     }
 
-    public function updateStatus(Request $request, int|string $id): RedirectResponse
+    public function updateestado(Request $request, int|string $id): RedirectResponse
     {
         $token = (string) $request->session()->get('api_token', '');
 
         $data = $request->validate([
-            'status' => ['required', 'string', 'in:open,in_progress,resolved,closed,false_report'],
+            'estado' => ['required', 'string', 'in:activa,in_progress,resolved,closed,falso_reporte'],
         ]);
 
         try {
@@ -143,7 +170,7 @@ final class ReportController
             return redirect()->route('login');
         } catch (ApiRequestException $e) {
             return back()->withErrors([
-                'status' => [$e->getMessage()],
+                'estado' => [$e->getMessage()],
             ]);
         }
 
@@ -156,7 +183,7 @@ final class ReportController
         $role = (string) ($user['role'] ?? '');
         $carnet = (string) ($user['carnet'] ?? '');
 
-        $query = FloodReport::query()->latest();
+        $query = Inundacion::query()->latest();
 
         if ($role !== 'authority' && $carnet !== '') {
             $query->where('citizen_carnet', $carnet);
@@ -171,7 +198,7 @@ final class ReportController
         return response()->json([
             'data' => [
                 'id' => (string) $latest->id,
-                'severity' => (string) $latest->severity,
+                'intensidad_actual' => (string) $latest->intensidad_actual,
             ],
         ]);
     }

@@ -1,9 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\AuthorityResponseController;
-use App\Http\Controllers\Api\FloodReportController;
+use App\Http\Controllers\Api\InundacionController;
 use App\Http\Controllers\Api\CentroAsistenciaController;
+use App\Http\Controllers\Api\ReporteController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -16,14 +16,18 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('reports', [FloodReportController::class, 'index']);
-    Route::post('reports', [FloodReportController::class, 'store']);
-    Route::get('reports/{report}', [FloodReportController::class, 'show']);
-    Route::patch('reports/{report}', [FloodReportController::class, 'update']);
+// Rutas públicas de reportes rápidos
+Route::post('reportes', [ReporteController::class, 'store']);
 
-    Route::get('reports/{report}/responses', [AuthorityResponseController::class, 'index']);
-    Route::post('reports/{report}/responses', [AuthorityResponseController::class, 'store']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('reports', [InundacionController::class, 'index']);
+    Route::post('reports', [InundacionController::class, 'store']);
+    Route::get('reports/{report}', [InundacionController::class, 'show']);
+    Route::patch('reports/{report}', [InundacionController::class, 'update']);
+
+    // Nuevas rutas de validación de reportes rápidos (Autoridad)
+    Route::get('reportes/pendientes', [ReporteController::class, 'pending']);
+    Route::post('reportes/{id}/validar', [ReporteController::class, 'validateReport']);
 
     // Logística: Centros de Asistencia / Acopio
     Route::get('centros', [CentroAsistenciaController::class, 'index']);

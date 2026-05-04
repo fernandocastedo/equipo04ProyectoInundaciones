@@ -33,12 +33,12 @@ final class FloodApiClient
     {
         $flag = env('FLOOD_API_INTERNAL', true);
 
-        return filter_var($flag, FILTER_VALIDATE_BOOL) !== false;
+        return true;
     }
 
     /**
      * @param  array<string,mixed>  $payload
-     * @return array{status:int,json:array<string,mixed>,body:string}
+     * @return array{estado:int,json:array<string,mixed>,body:string}
      */
     private function request(string $method, string $path, array $payload = [], ?string $token = null): array
     {
@@ -49,7 +49,7 @@ final class FloodApiClient
 
     /**
      * @param  array<string,mixed>  $payload
-     * @return array{status:int,json:array<string,mixed>,body:string}
+     * @return array{estado:int,json:array<string,mixed>,body:string}
      */
     private function requestHttp(string $method, string $path, array $payload = [], ?string $token = null): array
     {
@@ -72,7 +72,7 @@ final class FloodApiClient
         };
 
         return [
-            'status' => $response->status(),
+            'estado' => $response->status(),
             'json' => (array) $response->json(),
             'body' => $response->body(),
         ];
@@ -80,7 +80,7 @@ final class FloodApiClient
 
     /**
      * @param  array<string,mixed>  $payload
-     * @return array{status:int,json:array<string,mixed>,body:string}
+     * @return array{estado:int,json:array<string,mixed>,body:string}
      */
     private function requestInternal(string $method, string $path, array $payload = [], ?string $token = null): array
     {
@@ -126,7 +126,7 @@ final class FloodApiClient
         $this->kernel->terminate($request, $response);
 
         return [
-            'status' => $response->getStatusCode(),
+            'estado' => $response->getStatusCode(),
             'json' => is_array($decoded) ? $decoded : [],
             'body' => $body,
         ];
@@ -325,27 +325,27 @@ final class FloodApiClient
     }
 
     /**
-     * @param  array{status:int,json:array<string,mixed>,body:string}  $response
+     * @param  array{estado:int,json:array<string,mixed>,body:string}  $response
      */
     private function throwIfError(array $response): void
     {
-        if ($response['status'] >= 200 && $response['status'] < 300) {
+        if ($response['estado'] >= 200 && $response['estado'] < 300) {
             return;
         }
 
-        if ($response['status'] === 401) {
+        if ($response['estado'] === 401) {
             throw new ApiUnauthorizedException('No autorizado por la API.');
         }
 
         $payload = $response['json'];
 
-        if ($response['status'] === 422) {
+        if ($response['estado'] === 422) {
             $errors = (array) Arr::get($payload, 'errors', []);
             throw new ApiValidationException('Validación fallida.', $errors);
         }
 
         $message = (string) Arr::get($payload, 'message', $response['body']);
 
-        throw new ApiRequestException($message !== '' ? $message : 'Error al llamar la API.', $response['status'], $payload);
+        throw new ApiRequestException($message !== '' ? $message : 'Error al llamar la API.', $response['estado'], $payload);
     }
 }

@@ -16,6 +16,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            ProvinciasMunicipiosSeeder::class,
+        ]);
+
         User::query()->updateOrCreate(['carnet' => '10000001'], [
             'carnet' => '10000001',
             'name' => 'Test User',

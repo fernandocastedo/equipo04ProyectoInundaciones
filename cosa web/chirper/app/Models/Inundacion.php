@@ -14,11 +14,9 @@ class Inundacion extends Model
     protected $table = 'inundaciones';
 
     protected $fillable = [
-        'citizen_carnet',
+        'validador_id',
         'latitud',
         'longitud',
-        'provincia',
-        'municipio',
         'address',
         'description',
         'intensidad_actual',
@@ -34,11 +32,15 @@ class Inundacion extends Model
         'expira_at' => 'datetime',
     ];
 
-    public function citizen(): BelongsTo
+    public function validador(): BelongsTo
     {
-        return $this->belongsTo(User::class, foreignKey: 'citizen_carnet', ownerKey: 'carnet');
+        return $this->belongsTo(User::class, 'validador_id', 'carnet');
     }
 
+    public function municipio(): BelongsTo
+    {
+        return $this->belongsTo(Municipio::class, 'municipio_id');
+    }
 
     public function reportes(): HasMany
     {

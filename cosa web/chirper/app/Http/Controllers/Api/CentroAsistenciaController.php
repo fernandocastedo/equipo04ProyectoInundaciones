@@ -15,18 +15,29 @@ class CentroAsistenciaController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = CentroAsistencia::query();
+        $query = CentroAsistencia::with('municipio.provincia');
 
         if ($request->filled('provincia')) {
-            $query->where('provincia', $request->provincia);
+            $query->whereHas('municipio.provincia', function ($q) use ($request) {
+                $q->where('nombre', $request->provincia);
+            });
         }
 
         if ($request->filled('municipio')) {
-            $query->where('municipio', $request->municipio);
+            $query->whereHas('municipio', function ($q) use ($request) {
+                $q->where('nombre', $request->municipio);
+            });
         }
 
+        $centros = $query->get()->map(function ($centro) {
+            $data = $centro->toArray();
+            $data['provincia'] = $centro->municipio?->provincia?->nombre;
+            $data['municipio'] = $centro->municipio?->nombre;
+            return $data;
+        });
+
         return response()->json([
-            'data' => $query->get()
+            'data' => $centros
         ]);
     }
 
@@ -51,6 +62,13 @@ class CentroAsistenciaController extends Controller
             'contacto' => 'nullable|string|max:255',
             'encargado' => 'nullable|string|max:255',
         ]);
+
+        $muni = \App\Models\Municipio::where('nombre', $validated['municipio'])
+            ->whereHas('provincia', fn($q) => $q->where('nombre', $validated['provincia']))
+            ->first();
+            
+        $validated['municipio_id'] = $muni?->id;
+        unset($validated['provincia'], $validated['municipio']);
 
         // Guardamos
         $centro = CentroAsistencia::create($validated);
@@ -83,6 +101,18 @@ class CentroAsistenciaController extends Controller
             'contacto' => 'nullable|string|max:255',
             'encargado' => 'nullable|string|max:255',
         ]);
+
+        if (isset($validated['municipio']) && isset($validated['provincia'])) {
+            $muni = \App\Models\Municipio::where('nombre', $validated['municipio'])
+                ->whereHas('provincia', fn($q) => $q->where('nombre', $validated['provincia']))
+                ->first();
+            $validated['municipio_id'] = $muni?->id;
+        } elseif (isset($validated['municipio'])) {
+            $muni = \App\Models\Municipio::where('nombre', $validated['municipio'])->first();
+            $validated['municipio_id'] = $muni?->id;
+        }
+        
+        unset($validated['provincia'], $validated['municipio']);
 
         $centro->fill($validated);
         

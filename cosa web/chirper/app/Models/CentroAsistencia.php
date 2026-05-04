@@ -37,12 +37,16 @@ class CentroAsistencia extends Model
         'direccion',
         'latitud',
         'longitud',
-        'provincia',
-        'municipio',
+        'municipio_id',
         'hora_apertura',
         'hora_cierre',
         'contacto',
         'encargado',
         'ultima_actualizacion',
     ];
+
+    public function municipio()
+    {
+        return $this->belongsTo(Municipio::class, 'municipio_id');
+    }
 }

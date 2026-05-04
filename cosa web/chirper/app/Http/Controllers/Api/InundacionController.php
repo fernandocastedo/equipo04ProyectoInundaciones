@@ -25,11 +25,15 @@ class InundacionController extends Controller
         }
 
         if ($request->filled('provincia')) {
-            $query->where('provincia', $request->provincia);
+            $query->whereHas('municipio.provincia', function ($q) use ($request) {
+                $q->where('nombre', $request->provincia);
+            });
         }
 
         if ($request->filled('municipio')) {
-            $query->where('municipio', $request->municipio);
+            $query->whereHas('municipio', function ($q) use ($request) {
+                $q->where('nombre', $request->municipio);
+            });
         }
 
         $reports = $query->paginate(15);
@@ -45,12 +49,15 @@ class InundacionController extends Controller
 
         $data = $request->validated();
 
+        $muni = \App\Models\Municipio::where('nombre', $data['municipio'])
+            ->whereHas('provincia', fn($q) => $q->where('nombre', $data['provincia']))
+            ->first();
+
         $report = Inundacion::create([
             'citizen_carnet' => $user->carnet,
             'latitud' => $data['latitud'],
             'longitud' => $data['longitud'],
-            'provincia' => $data['provincia'],
-            'municipio' => $data['municipio'],
+            'municipio_id' => $muni?->id,
             'address' => $data['address'] ?? null,
             'description' => $data['description'],
             'intensidad_actual' => $data['intensidad_actual'],

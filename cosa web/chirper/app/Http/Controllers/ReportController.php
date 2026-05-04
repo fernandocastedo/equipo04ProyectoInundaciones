@@ -88,7 +88,9 @@ final class ReportController
             'longitud' => ['required', 'numeric', 'between:-180,180'],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'intensidad_actual' => ['required', 'string', 'in:low,medium,high'],
+            'intensidad_actual' => ['required', 'string', 'in:baja,media,alta'],
+            'provincia' => ['required', 'string'],
+            'municipio' => ['required', 'string'],
         ]);
 
         try {
@@ -121,7 +123,7 @@ final class ReportController
             $request->session()->forget(['api_token', 'api_user']);
             return redirect()->route('login');
         } catch (ApiRequestException $e) {
-            abort($e->estado, $e->getMessage());
+            abort($e->status, $e->getMessage());
         }
 
         return view('reports.show', [

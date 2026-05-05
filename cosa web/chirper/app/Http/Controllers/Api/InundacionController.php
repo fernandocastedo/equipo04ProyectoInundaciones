@@ -14,11 +14,13 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class InundacionController extends Controller
 {
+    /**
+     * Lista las inundaciones activas (las únicas visibles en el mapa).
+     * Las inundaciones 'terminada' y 'falsa' quedan fuera del mapa activo.
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $user = $request->user();
-
-        $query = Inundacion::query()->latest();
+        $query = Inundacion::activas()->latest();
 
         if ($request->filled('provincia')) {
             $query->whereHas('municipio.provincia', function ($q) use ($request) {
@@ -32,66 +34,79 @@ class InundacionController extends Controller
             });
         }
 
-        $reports = $query->paginate(15);
+        // Eager-load la relación filtrada por TTL para calcular quórum
+        // sin disparar N+1 queries al serializar el resource.
+        $reports = $query
+            ->with(['validador', 'reportesActivosTTL'])
+            ->paginate(15);
 
         return InundacionResource::collection($reports);
     }
 
+    /**
+     * Crea una nueva inundación manualmente (solo autoridades).
+     * La intensidad ya no se almacena: se calculará dinámicamente.
+     */
     public function store(StoreInundacionRequest $request): JsonResponse
     {
-        $user = $request->user();
-
         $this->authorize('create', Inundacion::class);
 
         $data = $request->validated();
+        $user = $request->user();
 
         $muni = \App\Models\Municipio::where('nombre', $data['municipio'])
             ->whereHas('provincia', fn($q) => $q->where('nombre', $data['provincia']))
             ->first();
 
-        $report = Inundacion::create([
+        $inundacion = Inundacion::create([
             'validador_id' => $user->isAuthority() ? $user->carnet : null,
-            'latitud' => $data['latitud'],
-            'longitud' => $data['longitud'],
+            'latitud'      => $data['latitud'],
+            'longitud'     => $data['longitud'],
             'municipio_id' => $muni?->id,
-            'address' => $data['address'] ?? null,
-            'description' => $data['description'],
-            'intensidad_actual' => $data['intensidad_actual'],
-            'estado' => 'activa',
+            'estado'       => Inundacion::ESTADO_ACTIVA,
         ]);
 
         return response()->json([
-            'data' => new InundacionResource($report),
+            'data' => new InundacionResource($inundacion),
         ], 201);
     }
 
+    /**
+     * Detalle de una inundación con quórum calculado al vuelo.
+     */
     public function show(Request $request, Inundacion $report): JsonResponse
     {
         $this->authorize('view', $report);
 
-        $report->load(['validador', 'reportes']);
+        $report->load(['validador', 'reportesActivosTTL']);
 
         return response()->json([
             'data' => new InundacionResource($report),
         ]);
     }
 
+    /**
+     * Actualiza una inundación (estado, coordenadas, municipio).
+     * Solo autoridades pueden cambiar el estado.
+     */
     public function update(UpdateInundacionRequest $request, Inundacion $report): JsonResponse
     {
         $this->authorize('update', $report);
 
         $data = $request->validated();
-
         $user = $request->user();
 
-        if (! $user->isAuthority() && array_key_exists('estado', $data)) {
+        // Doble check: solo autoridades modifican el estado
+        if (!$user->isAuthority() && array_key_exists('estado', $data)) {
             unset($data['estado']);
         }
 
         $report->fill($data);
         $report->save();
 
-        if ($user->isAuthority()) {
+        // Si la autoridad marcó la inundación como 'falsa',
+        // revisar el historial de reportes falsas de cada ciudadano vinculado.
+        if ($user->isAuthority() && ($data['estado'] ?? null) === Inundacion::ESTADO_FALSA) {
             $report->load('reportes');
             foreach ($report->reportes as $rep) {
                 if ($rep->citizen_carnet) {
@@ -100,19 +115,27 @@ class InundacionController extends Controller
             }
         }
 
-        $report->load(['validador', 'reportes']);
+        $report->load(['validador', 'reportesActivosTTL']);
 
         return response()->json([
             'data' => new InundacionResource($report),
         ]);
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers privados
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Recalcula el estado de baneo de un ciudadano en base a cuántas de
+     * sus inundaciones fueron marcadas como 'falsa'.
+     */
     private function refreshCitizenBanStatus(string $citizenCarnet): void
     {
         $falseReportsCount = \App\Models\Reporte::query()
             ->where('citizen_carnet', $citizenCarnet)
-            ->whereHas('inundacion', function($q) {
-                $q->where('estado', 'falso_reporte');
+            ->whereHas('inundacion', function ($q) {
+                $q->where('estado', Inundacion::ESTADO_FALSA);
             })
             ->count();
 

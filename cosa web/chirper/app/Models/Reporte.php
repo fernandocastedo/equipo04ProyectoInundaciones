@@ -10,6 +10,16 @@ class Reporte extends Model
 {
     use HasFactory;
 
+    public const VALIDACION_PENDIENTE = 'pendiente';
+    public const VALIDACION_ACEPTADO  = 'aceptado';
+    public const VALIDACION_RECHAZADO = 'rechazado';
+
+    /** Peso de un reporte sin foto. */
+    public const PESO_SIN_FOTO  = 1;
+
+    /** Peso de un reporte con foto adjunta. */
+    public const PESO_CON_FOTO  = 3;
+
     protected $table = 'reportes';
 
     protected $fillable = [
@@ -21,6 +31,7 @@ class Reporte extends Model
         'lat_reporte',
         'long_reporte',
         'intensidad_propuesta',
+        'peso',
         'address',
         'description',
         'foto_path',
@@ -29,10 +40,11 @@ class Reporte extends Model
     ];
 
     protected $casts = [
-        'lat_gps' => 'decimal:7',
-        'long_gps' => 'decimal:7',
-        'lat_reporte' => 'decimal:7',
-        'long_reporte' => 'decimal:7',
+        'lat_gps'          => 'decimal:7',
+        'long_gps'         => 'decimal:7',
+        'lat_reporte'      => 'decimal:7',
+        'long_reporte'     => 'decimal:7',
+        'peso'             => 'integer',
         'datos_clima_json' => 'array',
     ];
 
@@ -44,5 +56,13 @@ class Reporte extends Model
     public function citizen(): BelongsTo
     {
         return $this->belongsTo(User::class, foreignKey: 'citizen_carnet', ownerKey: 'carnet');
+    }
+
+    /**
+     * Calcula el peso que debe tener este reporte según si incluye foto.
+     */
+    public static function calcularPeso(?string $fotoPath): int
+    {
+        return $fotoPath !== null ? self::PESO_CON_FOTO : self::PESO_SIN_FOTO;
     }
 }

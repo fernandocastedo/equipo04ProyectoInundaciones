@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\User;
+use App\Models\Inundacion;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateInundacionRequest extends FormRequest
@@ -28,17 +28,29 @@ class UpdateInundacionRequest extends FormRequest
     public function rules(): array
     {
         $baseRules = [
-            'latitud' => ['sometimes', 'numeric', 'between:-90,90'],
-            'longitud' => ['sometimes', 'numeric', 'between:-180,180'],
+            'latitud'   => ['sometimes', 'numeric', 'between:-90,90'],
+            'longitud'  => ['sometimes', 'numeric', 'between:-180,180'],
             'provincia' => ['sometimes', 'string', 'max:255'],
             'municipio' => ['sometimes', 'string', 'max:255'],
-            'address' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'address'   => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'string'],
-            'intensidad_actual' => ['sometimes', 'string', 'in:baja,media,alta'],
+            // intensidad_actual eliminado: se calcula dinámicamente.
         ];
 
         if ($this->user()?->isAuthority()) {
-            $baseRules['estado'] = ['sometimes', 'string', 'in:activa,finalizada,falso_reporte'];
+            // Estados normalizados según spec (Opción 2):
+            //   'activa'    → sigue visible en el mapa (con validación de quórum)
+            //   'terminada' → pasa al historial, no aparece en mapa activo
+            //   'falsa'     → oculta del mapa para todos los ciudadanos
+            $baseRules['estado'] = [
+                'sometimes',
+                'string',
+                'in:' . implode(',', [
+                    Inundacion::ESTADO_ACTIVA,
+                    Inundacion::ESTADO_TERMINADA,
+                    Inundacion::ESTADO_FALSA,
+                ]),
+            ];
         }
 
         return $baseRules;

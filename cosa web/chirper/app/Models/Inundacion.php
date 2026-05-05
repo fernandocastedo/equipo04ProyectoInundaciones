@@ -6,10 +6,29 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
+/**
+ * Modelo Inundacion — Quórum Dinámico
+ *
+ * Los campos puntos_quorum, intensidad_actual y expira_at fueron eliminados
+ * de la tabla. El quórum y la intensidad se calculan al vuelo usando los
+ * reportes asociados que estén dentro del TTL (3 horas).
+ */
 class Inundacion extends Model
 {
     use HasFactory;
+
+    /** Tiempo de vida (TTL) de un reporte en horas para el cómputo de quórum. */
+    public const TTL_HORAS = 3;
+
+    /** Puntos mínimos para considerar una inundación como "Confirmada". */
+    public const UMBRAL_QUORUM = 5;
+
+    public const ESTADO_ACTIVA    = 'activa';
+    public const ESTADO_TERMINADA = 'terminada';
+    public const ESTADO_FALSA     = 'falsa';
 
     protected $table = 'inundaciones';
 
@@ -17,18 +36,18 @@ class Inundacion extends Model
         'validador_id',
         'latitud',
         'longitud',
-        'intensidad_actual',
         'estado',
         'municipio_id',
-        'puntos_quorum',
-        'expira_at',
     ];
 
     protected $casts = [
-        'latitud' => 'decimal:7',
+        'latitud'  => 'decimal:7',
         'longitud' => 'decimal:7',
-        'expira_at' => 'datetime',
     ];
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Relaciones
+    // ─────────────────────────────────────────────────────────────────────
 
     public function validador(): BelongsTo
     {
@@ -43,5 +62,92 @@ class Inundacion extends Model
     public function reportes(): HasMany
     {
         return $this->hasMany(Reporte::class, 'inundacion_id');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Cómputo dinámico de Quórum
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Devuelve los reportes válidos para el cómputo de quórum:
+     *   - Creados dentro del TTL (últimas N horas)
+     *   - Sin estado_validacion = 'rechazado'
+     */
+    public function reportesActivosTTL(): HasMany
+    {
+        return $this->reportes()
+            ->where('created_at', '>=', Carbon::now()->subHours(self::TTL_HORAS))
+            ->where('estado_validacion', '!=', Reporte::VALIDACION_RECHAZADO);
+    }
+
+    /**
+     * Suma total de puntos (peso) de los reportes dentro del TTL.
+     * Asume que la relación reportesActivosTTL ya fue cargada con eager load.
+     */
+    public function quorumTotal(): int
+    {
+        // Si la colección ya fue eager-loaded usamos sum() en memoria,
+        // evitando una query adicional por cada inundación.
+        if ($this->relationLoaded('reportesActivosTTL')) {
+            return (int) $this->reportesActivosTTL->sum('peso');
+        }
+
+        return (int) $this->reportesActivosTTL()->sum('peso');
+    }
+
+    /**
+     * Indica si la inundación ha alcanzado el umbral de confirmación.
+     */
+    public function estaConfirmada(): bool
+    {
+        return $this->quorumTotal() >= self::UMBRAL_QUORUM;
+    }
+
+    /**
+     * Determina la intensidad ganadora por votación ponderada.
+     * En caso de empate, se prioriza la intensidad más alta.
+     *
+     * @return string|null  'baja' | 'media' | 'alta' | null si no hay reportes
+     */
+    public function intensidadCalculada(): ?string
+    {
+        $reportes = $this->relationLoaded('reportesActivosTTL')
+            ? $this->reportesActivosTTL
+            : $this->reportesActivosTTL()->get();
+
+        if ($reportes->isEmpty()) {
+            return null;
+        }
+
+        $puntos = [
+            'alta'  => 0,
+            'media' => 0,
+            'baja'  => 0,
+        ];
+
+        foreach ($reportes as $reporte) {
+            $intensidad = $reporte->intensidad_propuesta;
+            if (array_key_exists($intensidad, $puntos)) {
+                $puntos[$intensidad] += $reporte->peso;
+            }
+        }
+
+        // En empate, arsort() mantiene el orden alta > media > baja
+        // porque iteramos en ese orden y arsort es estable en PHP ≥ 8.
+        arsort($puntos);
+
+        return (string) array_key_first($puntos);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Scopes de conveniencia
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Scope: solo inundaciones activas (las visibles en el mapa).
+     */
+    public function scopeActivas(Builder $query): Builder
+    {
+        return $query->where('estado', self::ESTADO_ACTIVA);
     }
 }

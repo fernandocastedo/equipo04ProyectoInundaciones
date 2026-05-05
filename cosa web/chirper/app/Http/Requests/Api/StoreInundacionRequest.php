@@ -27,13 +27,14 @@ class StoreInundacionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'latitud' => ['required', 'numeric', 'between:-90,90'],
-            'longitud' => ['required', 'numeric', 'between:-180,180'],
+            'latitud'   => ['required', 'numeric', 'between:-90,90'],
+            'longitud'  => ['required', 'numeric', 'between:-180,180'],
             'provincia' => ['required', 'string', 'max:255'],
             'municipio' => ['required', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'address'   => ['nullable', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'intensidad_actual' => ['required', 'string', 'in:baja,media,alta'],
+            // intensidad_actual eliminado: ahora se calcula dinámicamente
+            // desde los reportes vinculados (quórum ponderado).
         ];
     }
 }

@@ -25,9 +25,10 @@ Route::middleware(RedirectIfApiAuthenticated::class)->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::get('/reporte-rapido', function () { 
-    $activas = \App\Models\Inundacion::where('estado', 'activa')->get(['id', 'latitud', 'longitud', 'intensidad_actual']);
-    return view('reports.rapido', ['inundacionesActivas' => $activas]); 
+Route::get('/reporte-rapido', function () {
+    // Solo id, latitud y longitud — intensidad_actual fue eliminada (cálculo dinámico).
+    $activas = \App\Models\Inundacion::where('estado', 'activa')->get(['id', 'latitud', 'longitud']);
+    return view('reports.rapido', ['inundacionesActivas' => $activas]);
 })->name('reports.rapido');
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
@@ -38,7 +39,9 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
     Route::middleware(EnsureApiAuthority::class)->group(function () {
         Route::post('/reports/{id}/responses', [ReportController::class, 'storeResponse'])->name('reports.responses.store');
-        Route::post('/reports/{id}/status', [ReportController::class, 'updateStatus'])->name('reports.status.update');
+        Route::post('/reports/{id}/status', [ReportController::class, 'updateestado'])->name('reports.status.update');
+        // Ruta directa para desactivar una inundación desde el listado
+        Route::post('/reports/{id}/desactivar', [ReportController::class, 'desactivar'])->name('reports.desactivar');
         Route::get('/reports/notifications/latest', [ReportController::class, 'latestForNotifications'])->name('reports.notifications.latest');
     });
 

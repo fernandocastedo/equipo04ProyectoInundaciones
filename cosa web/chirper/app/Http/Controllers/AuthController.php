@@ -132,7 +132,7 @@ final class AuthController
         if ($token !== '') {
             try {
                 $this->api->logout($token);
-            } catch (ApiRequestException) {
+            } catch (ApiUnauthorizedException|ApiRequestException) {
                 // ignore API errors on logout
             }
         }

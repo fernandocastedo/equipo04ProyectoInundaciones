@@ -27,6 +27,47 @@
         </div>
     @endif
 
+    @if(count($misReportes ?? []) > 0 || (isset($role) && $role === 'citizen'))
+        <div class="overflow-hidden rounded-lg border border-indigo-200 bg-white shadow-sm mb-8">
+            <div class="px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+                <h2 class="text-lg font-medium text-indigo-900">Mis reportes enviados</h2>
+                <span class="text-xs text-indigo-700 font-medium">{{ count($misReportes ?? []) }} registro(s)</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-700">
+                        <tr>
+                            <th class="text-left font-medium px-3 py-2">ID</th>
+                            <th class="text-left font-medium px-3 py-2">Estado validación</th>
+                            <th class="text-left font-medium px-3 py-2">Intensidad propuesta</th>
+                            <th class="text-left font-medium px-3 py-2">Última actualización</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        @forelse(($misReportes ?? []) as $rep)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-3 py-2 font-medium">#{{ $rep->id }}</td>
+                                <td class="px-3 py-2">
+                                    @php($estadoVal = (string) $rep->estado_validacion)
+                                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
+                                        {{ $estadoVal === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : ($estadoVal === 'aceptado' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700') }}">
+                                        {{ ucfirst($estadoVal) }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2">{{ ucfirst((string) $rep->intensidad_propuesta) }}</td>
+                                <td class="px-3 py-2">{{ optional($rep->updated_at)->format('d/m/Y H:i') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td class="px-3 py-6 text-gray-600 text-center" colspan="4">Aún no has enviado reportes.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     {{-- ══════════════════════════════════════════════════════════════════
          TABLA: Inundaciones Activas / Pasadas
     ══════════════════════════════════════════════════════════════════ --}}

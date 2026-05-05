@@ -9,8 +9,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'Flood Reports') }}</title>
     <meta name="api-user-role" content="{{ $apiRole }}">
-    @if ($apiRole === 'authority')
-        <meta name="reports-notifications-endpoint" content="{{ route('reports.notifications.latest', [], false) }}">
+    @if (session()->has('api_token'))
+        <meta name="reports-notifications-endpoint" content="{{ route('reports.notifications.feed', [], false) }}">
+        <meta name="api-user-carnet" content="{{ (string) ($apiUser['carnet'] ?? '') }}">
     @endif
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -96,6 +97,24 @@
                         title="Guardar mi ubicación para encontrar centros cercanos">
                         <span id="geo-btn-icon">📍</span>
                     </button>
+                    <div class="relative">
+                        <button id="notifications-toggle"
+                            class="rounded-md px-2 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-1 text-sm"
+                            title="Notificaciones">
+                            <span>🔔</span>
+                            <span id="notifications-badge"
+                                class="hidden min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">0</span>
+                        </button>
+                        <div id="notifications-panel"
+                            class="hidden absolute right-0 z-50 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <div class="border-b border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600">
+                                Notificaciones
+                            </div>
+                            <div id="notifications-list" class="max-h-80 overflow-y-auto">
+                                <div class="px-3 py-4 text-xs text-gray-500">Sin notificaciones por ahora.</div>
+                            </div>
+                        </div>
+                    </div>
                     <form method="POST" action="{{ route('logout', [], false) }}">
                         @csrf
                         <button type="submit"

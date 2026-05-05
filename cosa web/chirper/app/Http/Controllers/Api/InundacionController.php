@@ -60,11 +60,32 @@ class InundacionController extends Controller
 
         $inundacion = Inundacion::create([
             'validador_id' => $user->isAuthority() ? $user->carnet : null,
+            'citizen_carnet' => $user->isCitizen() ? $user->carnet : null,
             'latitud'      => $data['latitud'],
             'longitud'     => $data['longitud'],
             'municipio_id' => $muni?->id,
             'estado'       => Inundacion::ESTADO_ACTIVA,
         ]);
+
+        // Si un ciudadano creó la inundación desde el formulario, también
+        // registramos un `Reporte` vinculado para que aparezca en "Mis reportes"
+        // y quede trazable en el historial.
+        if ($user->isCitizen()) {
+            \App\Models\Reporte::create([
+                'user_uuid' => null,
+                'citizen_carnet' => $user->carnet,
+                'inundacion_id' => $inundacion->id,
+                'lat_gps' => $data['latitud'],
+                'long_gps' => $data['longitud'],
+                'lat_reporte' => $data['latitud'],
+                'long_reporte' => $data['longitud'],
+                'intensidad_propuesta' => $data['intensidad_actual'] ?? 'media',
+                'peso' => \App\Models\Reporte::PESO_SIN_FOTO,
+                'address' => $data['address'] ?? null,
+                'description' => $data['description'] ?? null,
+                'estado_validacion' => \App\Models\Reporte::VALIDACION_ACEPTADO,
+            ]);
+        }
 
         return response()->json([
             'data' => new InundacionResource($inundacion),

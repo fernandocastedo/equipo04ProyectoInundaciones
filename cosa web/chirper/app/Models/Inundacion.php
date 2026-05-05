@@ -33,6 +33,7 @@ class Inundacion extends Model
     protected $table = 'inundaciones';
 
     protected $fillable = [
+        'citizen_carnet',
         'validador_id',
         'latitud',
         'longitud',

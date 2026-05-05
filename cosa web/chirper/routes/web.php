@@ -35,6 +35,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/maps', [MapController::class, 'index'])->name('maps.index');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
     Route::post('/reports', [ReportController::class, 'store'])->name('reports.store');
+    Route::get('/reports/notifications/feed', [ReportController::class, 'notificationsFeed'])->name('reports.notifications.feed');
     Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show');
 
     Route::middleware(EnsureApiAuthority::class)->group(function () {

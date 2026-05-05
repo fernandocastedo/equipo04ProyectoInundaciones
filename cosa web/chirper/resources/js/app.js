@@ -1,7 +1,6 @@
 import './bootstrap';
 
 const POLL_INTERVAL_MS = 15000;
-const LAST_REPORT_KEY = 'authority:last_seen_report_id';
 
 function getMetaContent(name) {
 	const element = document.querySelector(`meta[name="${name}"]`);
@@ -9,23 +8,22 @@ function getMetaContent(name) {
 	return element ? element.getAttribute('content') ?? '' : '';
 }
 
-function parseReportId(reportId) {
-	const numericId = Number.parseInt(String(reportId), 10);
-
-	return Number.isNaN(numericId) ? null : numericId;
+function getStorageKey(role, carnet) {
+	return `notifications:last_seen:${role}:${carnet || 'anon'}`;
 }
 
-function getStoredLastSeenId() {
-	const value = window.localStorage.getItem(LAST_REPORT_KEY);
-
-	return value === null ? null : parseReportId(value);
+function getStoredCursor(role, carnet) {
+	const key = getStorageKey(role, carnet);
+	const value = window.localStorage.getItem(key);
+	const parsed = Number.parseInt(String(value), 10);
+	return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function setStoredLastSeenId(reportId) {
-	window.localStorage.setItem(LAST_REPORT_KEY, String(reportId));
+function setStoredCursor(role, carnet, cursor) {
+	window.localStorage.setItem(getStorageKey(role, carnet), String(cursor));
 }
 
-async function fetchLatestReport(endpoint) {
+async function fetchNotifications(endpoint) {
 	const response = await window.fetch(endpoint, {
 		method: 'GET',
 		headers: {
@@ -35,105 +33,148 @@ async function fetchLatestReport(endpoint) {
 	});
 
 	if (!response.ok) {
-		return null;
+		return [];
 	}
 
 	const payload = await response.json();
-	const data = payload?.data;
-
-	if (!data || data.id === undefined || data.id === null) {
-		return null;
-	}
-
-	const reportId = parseReportId(data.id);
-
-	if (reportId === null) {
-		return null;
-	}
-
-	return {
-		id: reportId,
-		severity: String(data.severity ?? ''),
-	};
+	const items = Array.isArray(payload?.data) ? payload.data : [];
+	return items.map((item) => ({
+		id: String(item?.id ?? ''),
+		cursor: Number.parseInt(String(item?.cursor ?? 0), 10) || 0,
+		title: String(item?.title ?? 'Notificacion'),
+		message: String(item?.message ?? ''),
+		createdAt: String(item?.created_at ?? ''),
+		link: String(item?.link ?? ''),
+	}));
 }
 
-function showNotificationForReport(report) {
+function showDesktopNotification(item) {
 	if (!('Notification' in window) || Notification.permission !== 'granted') {
 		return;
 	}
 
-	const severity = report.severity.trim() === '' ? 'desconocida' : report.severity;
-
-	new Notification(`nuevo reporte de amenaza ${severity}`);
+	new Notification(item.title, { body: item.message });
 }
 
-async function startAuthorityNotifications(endpoint) {
-	if (!('Notification' in window)) {
-		console.warn('Desktop notifications are not supported by this browser.');
+async function startNotifications(endpoint, role, carnet) {
+	console.debug('startNotifications()', { endpoint, role, carnet });
+	const toggleBtn = document.getElementById('notifications-toggle');
+	const panel = document.getElementById('notifications-panel');
+	const list = document.getElementById('notifications-list');
+	const badge = document.getElementById('notifications-badge');
+
+	if (!toggleBtn || !panel || !list || !badge) {
 		return;
 	}
 
-	if (!window.isSecureContext) {
-		console.warn('Desktop notifications require a secure context (https or localhost).');
-		return;
-	}
+	let latestCursor = getStoredCursor(role, carnet);
+	let initialized = false;
+	let isPanelOpen = false;
 
-	if (Notification.permission === 'default') {
-		try {
-			await Notification.requestPermission();
-		} catch (error) {
-			console.warn('Could not request notification permission.', error);
+	function render(items) {
+		if (items.length === 0) {
+			list.innerHTML = '<div class="px-3 py-4 text-xs text-gray-500">Sin notificaciones por ahora.</div>';
+			badge.classList.add('hidden');
 			return;
+		}
+
+		list.innerHTML = items
+			.map((item) => {
+				const link = item.link || '/reports';
+				return `
+					<a href="${link}" class="block border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50">
+						<div class="text-xs font-semibold text-gray-800">${item.title}</div>
+						<div class="mt-0.5 text-xs text-gray-600">${item.message}</div>
+					</a>
+				`;
+			})
+			.join('');
+
+		const unseen = items.filter((item) => item.cursor > latestCursor).length;
+		if (unseen > 0 && !isPanelOpen) {
+			badge.textContent = unseen > 99 ? '99+' : String(unseen);
+			badge.classList.remove('hidden');
+		} else {
+			badge.classList.add('hidden');
 		}
 	}
 
-	if (Notification.permission !== 'granted') {
-		console.warn('Notification permission was not granted.');
-		return;
-	}
-
-	let lastSeenId = getStoredLastSeenId();
-
-	const checkForNewReports = async (notify) => {
+	async function poll(notifyDesktop) {
 		try {
-			const latest = await fetchLatestReport(endpoint);
+			const items = await fetchNotifications(endpoint);
+			render(items);
 
-			if (latest === null) {
-				return;
-			}
+			if (items.length > 0) {
+				const maxCursor = Math.max(...items.map((item) => item.cursor));
+				if (notifyDesktop && initialized && maxCursor > latestCursor) {
+					const newest = items.find((item) => item.cursor === maxCursor);
+					if (newest) {
+						showDesktopNotification(newest);
+					}
+				}
 
-			if (lastSeenId === null) {
-				lastSeenId = latest.id;
-				setStoredLastSeenId(latest.id);
-				return;
-			}
-
-			if (latest.id > lastSeenId) {
-				lastSeenId = latest.id;
-				setStoredLastSeenId(latest.id);
-
-				if (notify) {
-					showNotificationForReport(latest);
+				if (!initialized) {
+					latestCursor = maxCursor;
+					setStoredCursor(role, carnet, latestCursor);
 				}
 			}
 		} catch {
 			// Ignore transient errors to keep polling active.
 		}
-	};
 
-	await checkForNewReports(false);
+		initialized = true;
+	}
+
+	 toggleBtn.addEventListener('click', () => {
+		console.debug('notifications-toggle clicked', { hidden: panel.classList.contains('hidden') });
+		isPanelOpen = !panel.classList.contains('hidden');
+		if (isPanelOpen) {
+			panel.classList.add('hidden');
+			console.debug('notifications-panel hidden');
+			return;
+		}
+
+		panel.classList.remove('hidden');
+		isPanelOpen = true;
+		console.debug('notifications-panel shown');
+
+		fetchNotifications(endpoint).then((items) => {
+			render(items);
+			if (items.length > 0) {
+				latestCursor = Math.max(latestCursor, ...items.map((item) => item.cursor));
+				setStoredCursor(role, carnet, latestCursor);
+				badge.classList.add('hidden');
+			}
+		});
+	});
+
+	document.addEventListener('click', (event) => {
+		console.debug('document click', { target: event.target, panelHidden: panel.classList.contains('hidden') });
+		if (!panel.contains(event.target) && !toggleBtn.contains(event.target)) {
+			panel.classList.add('hidden');
+			isPanelOpen = false;
+			console.debug('notifications-panel hidden by outside click');
+		}
+	});
+
+	if ('Notification' in window && window.isSecureContext && Notification.permission === 'default') {
+		Notification.requestPermission().catch(() => {});
+	}
+
+	await poll(false);
 	window.setInterval(() => {
-		checkForNewReports(true);
+		poll(true);
 	}, POLL_INTERVAL_MS);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
 	const role = getMetaContent('api-user-role').trim().toLowerCase();
+	const carnet = getMetaContent('api-user-carnet').trim();
 	const endpoint = getMetaContent('reports-notifications-endpoint');
 
-	if (role !== 'authority' || endpoint === '') {
+	if (endpoint === '') {
 		return;
 	}
 
-	startAuthorityNotifications(endpoint);
+	startNotifications(endpoint, role, carnet);
 });

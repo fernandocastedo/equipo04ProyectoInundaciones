@@ -68,6 +68,7 @@ final class ReportController
         // ── Paneles de autoridad (pendientes + rechazados) ─────────────────
         $reportesPendientes = [];
         $reportesRechazados = [];
+        $inundacionesActivasParaVincular = collect();
         if ($role === 'authority') {
             $reportesPendientes = Reporte::whereNull('inundacion_id')
                 ->where('estado_validacion', Reporte::VALIDACION_PENDIENTE)
@@ -80,6 +81,7 @@ final class ReportController
 
             // Calcular inundaciones cercanas (radio 300 m) a cada reporte pendiente
             $activas = Inundacion::activas()->get();
+            $inundacionesActivasParaVincular = $activas;
             foreach ($reportesPendientes as $rep) {
                 $cercanas = [];
                 foreach ($activas as $activa) {
@@ -105,6 +107,7 @@ final class ReportController
             'misReportes'            => $misReportes,
             'reportesPendientes'     => $reportesPendientes,
             'reportesRechazados'     => $reportesRechazados,
+            'inundacionesActivasParaVincular' => $inundacionesActivasParaVincular,
             'meta' => [
                 'current_page' => $activasPaginator->currentPage(),
                 'last_page'    => $activasPaginator->lastPage(),
@@ -332,6 +335,36 @@ final class ReportController
 
         return redirect()->route('reports.index')
             ->with('success', "Inundación #{$id} marcada como terminada correctamente.");
+    }
+
+    /**
+     * Actualiza el estado de validación de un reporte (panel de rechazados).
+     */
+    public function updateEstadoValidacion(Request $request, int|string $id): RedirectResponse
+    {
+        $estadoValidacion = (string) $request->input('estado_validacion', '');
+        $data = $request->validate([
+            'estado_validacion' => ['required', 'string', 'in:pendiente,aceptado,rechazado'],
+            'inundacion_id' => ['nullable', 'integer', 'exists:inundaciones,id'],
+        ]);
+
+        if ($estadoValidacion === Reporte::VALIDACION_ACEPTADO && empty($data['inundacion_id'])) {
+            return redirect()->route('reports.index')
+                ->with('error', 'Para marcar como aceptado debes seleccionar una inundación para vincular.');
+        }
+
+        $reporte = Reporte::findOrFail((int) $id);
+        $nuevoEstado = (string) $data['estado_validacion'];
+        $reporte->update([
+            'estado_validacion' => $nuevoEstado,
+            // Si se acepta, queda vinculado; en otro estado, se limpia vínculo.
+            'inundacion_id' => $nuevoEstado === Reporte::VALIDACION_ACEPTADO
+                ? (int) $data['inundacion_id']
+                : null,
+        ]);
+
+        return redirect()->route('reports.index')
+            ->with('success', "Estado de validación del reporte #{$reporte->id} actualizado a \"{$nuevoEstado}\".");
     }
 
     public function latestForNotifications(Request $request): JsonResponse

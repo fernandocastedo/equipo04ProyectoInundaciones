@@ -228,6 +228,16 @@
                             </div>
                             <p class="text-sm text-gray-600 mt-1">Intensidad Propuesta: <span class="font-bold text-orange-600">{{ ucfirst($rep->intensidad_propuesta) }}</span></p>
                             <p class="text-xs text-gray-500 mt-1">Ubicación GPS: {{ $rep->lat_gps }}, {{ $rep->long_gps }}</p>
+                            @if(!empty($rep->foto_path))
+                                <div class="mt-3">
+                                    <p class="text-xs text-gray-500 mb-1">Evidencia fotográfica:</p>
+                                    <a href="{{ asset('storage/' . $rep->foto_path) }}" target="_blank" rel="noopener noreferrer" class="inline-block">
+                                        <img src="{{ asset('storage/' . $rep->foto_path) }}"
+                                             alt="Foto del reporte #{{ $rep->id }}"
+                                             class="w-28 h-28 object-cover rounded border border-orange-200 hover:opacity-90 transition">
+                                    </a>
+                                </div>
+                            @endif
                         </div>
 
                         <div class="mt-4 flex items-center gap-2 flex-wrap">
@@ -287,7 +297,8 @@
                     </div>
 
                     {{-- Datos --}}
-                    <div class="flex-1 p-3 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs text-gray-700">
+                    <div class="flex-1 p-3 text-xs text-gray-700">
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
                         <div>
                             <span class="font-semibold text-gray-500 block">ID</span>
                             #{{ $rep->id }}
@@ -323,6 +334,41 @@
                             <span class="font-semibold text-gray-500 block">Fecha de Rechazo</span>
                             {{ $rep->updated_at->format('d/m/Y H:i') }}
                         </div>
+                        </div>
+
+                        @if(isset($role) && $role === 'authority')
+                            <form method="POST"
+                                  action="{{ route('reports.rechazados.estado_validacion.update', ['id' => $rep->id], false) }}"
+                                  class="mt-3 flex flex-wrap items-end gap-2 border-t border-red-100 pt-3">
+                                @csrf
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-[11px] font-semibold text-gray-600">Estado validación</label>
+                                    <select name="estado_validacion"
+                                            class="text-xs border border-red-200 rounded px-2 py-1 bg-white text-gray-700">
+                                        <option value="pendiente">Pendiente</option>
+                                        <option value="aceptado">Aceptado</option>
+                                        <option value="rechazado" selected>Rechazado</option>
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-[11px] font-semibold text-gray-600">Vincular a inundación</label>
+                                    <select name="inundacion_id"
+                                            class="text-xs border border-red-200 rounded px-2 py-1 bg-white text-gray-700 min-w-[170px]">
+                                        <option value="">Selecciona (obligatorio si aceptas)</option>
+                                        @foreach(($inundacionesActivasParaVincular ?? []) as $inundacionActiva)
+                                            <option value="{{ $inundacionActiva->id }}"
+                                                {{ (int) ($rep->inundacion_id ?? 0) === (int) $inundacionActiva->id ? 'selected' : '' }}>
+                                                Inundación #{{ $inundacionActiva->id }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="submit"
+                                        class="text-xs bg-gray-800 text-white px-3 py-1.5 rounded hover:bg-gray-700">
+                                    Actualizar
+                                </button>
+                            </form>
+                        @endif
                     </div>
 
                     {{-- Badge estado --}}

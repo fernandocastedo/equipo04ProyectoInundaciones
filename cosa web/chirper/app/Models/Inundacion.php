@@ -84,9 +84,22 @@ class Inundacion extends Model
      */
     public function reportesActivosTTL(): HasMany
     {
+        $ttlInicio = Carbon::now()->subHours(self::TTL_HORAS);
+        $ahora     = Carbon::now();
+
         return $this->reportes()
-            ->where('created_at', '>=', Carbon::now()->subHours(self::TTL_HORAS))
-            ->where('estado_validacion', '!=', Reporte::VALIDACION_RECHAZADO);
+            ->where(function (Builder $query) use ($ttlInicio, $ahora) {
+                $query->whereBetween('created_at', [$ttlInicio, $ahora])
+                    // Fallback para filas legacy sin created_at.
+                    ->orWhere(function (Builder $fallback) use ($ttlInicio, $ahora) {
+                        $fallback->whereNull('created_at')
+                            ->whereBetween('updated_at', [$ttlInicio, $ahora]);
+                    });
+            })
+            ->whereNotIn('estado_validacion', [
+                Reporte::VALIDACION_RECHAZADO,
+                'rechazada',
+            ]);
     }
 
     /**

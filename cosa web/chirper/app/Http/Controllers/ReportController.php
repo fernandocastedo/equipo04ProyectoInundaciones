@@ -26,45 +26,71 @@ final class ReportController
 
     public function index(Request $request): View|RedirectResponse
     {
-        $user = (array) $request->session()->get('api_user', []);
-        $role = (string) ($user['role'] ?? '');
+        $user   = (array) $request->session()->get('api_user', []);
+        $role   = (string) ($user['role'] ?? '');
         $carnet = (string) ($user['carnet'] ?? '');
-        $page = max(1, (int) $request->query('page', '1'));
+        $page   = max(1, (int) $request->query('page', '1'));
 
-        $query = Inundacion::query()->latest();
+        // ── Inundaciones ACTIVAS (paginadas) ──────────────────────────────
+        // Cargamos reportesActivosTTL para quórum dinámico y reportes para
+        // address/description del primer reporte vinculado.
+        $activasPaginator = Inundacion::activas()
+            ->with(['reportesActivosTTL', 'reportes'])
+            ->latest()
+            ->paginate(15, ['*'], 'page', $page);
 
-        $reports = $query->with('reportes')->paginate(15, ['*'], 'page', $page);
+        // IMPORTANTE: data_get() en Blade accede a propiedades, NO llama métodos.
+        // Por eso transformamos cada modelo Eloquent a un array plano con todos
+        // los campos calculados ya resueltos.
+        $inundacionesActivas = collect($activasPaginator->items())
+            ->map(fn (Inundacion $i) => $this->serializarActiva($i))
+            ->all();
 
+        // ── Inundaciones TERMINADAS (historial completo, sin paginación) ───
+        // Para terminadas usamos TODOS los reportes (sin filtro TTL) porque
+        // el TTL aplica solo al mapa activo; aquí queremos el total histórico.
+        $inundacionesTerminadas = Inundacion::terminadas()
+            ->with('reportes')
+            ->latest('updated_at')
+            ->get()
+            ->map(fn (Inundacion $i) => $this->serializarTerminada($i))
+            ->all();
+
+        // ── Reportes del ciudadano autenticado ────────────────────────────
+        $misReportes = [];
+        if ($carnet !== '') {
+            $misReportes = Reporte::where('citizen_carnet', $carnet)
+                ->latest('updated_at')
+                ->limit(20)
+                ->get();
+        }
+
+        // ── Paneles de autoridad (pendientes + rechazados) ─────────────────
         $reportesPendientes = [];
         $reportesRechazados = [];
-        $misReportes = [];
         if ($role === 'authority') {
-            // Solo reportes SIN inundación asignada y en estado pendiente
-            $reportesPendientes = \App\Models\Reporte::whereNull('inundacion_id')
-                ->where('estado_validacion', \App\Models\Reporte::VALIDACION_PENDIENTE)
+            $reportesPendientes = Reporte::whereNull('inundacion_id')
+                ->where('estado_validacion', Reporte::VALIDACION_PENDIENTE)
                 ->latest()
                 ->get();
 
-            // Reportes rechazados para el panel inferior
-            $reportesRechazados = \App\Models\Reporte::where('estado_validacion', \App\Models\Reporte::VALIDACION_RECHAZADO)
+            $reportesRechazados = Reporte::where('estado_validacion', Reporte::VALIDACION_RECHAZADO)
                 ->latest('updated_at')
                 ->get();
 
-            $activas = \App\Models\Inundacion::where('estado', 'activa')->get();
-
+            // Calcular inundaciones cercanas (radio 300 m) a cada reporte pendiente
+            $activas = Inundacion::activas()->get();
             foreach ($reportesPendientes as $rep) {
                 $cercanas = [];
                 foreach ($activas as $activa) {
-                    $lat1 = deg2rad((float)$rep->lat_gps);
-                    $lon1 = deg2rad((float)$rep->long_gps);
-                    $lat2 = deg2rad((float)$activa->latitud);
-                    $lon2 = deg2rad((float)$activa->longitud);
+                    $lat1 = deg2rad((float) $rep->lat_gps);
+                    $lon1 = deg2rad((float) $rep->long_gps);
+                    $lat2 = deg2rad((float) $activa->latitud);
+                    $lon2 = deg2rad((float) $activa->longitud);
                     $dLat = $lat2 - $lat1;
                     $dLon = $lon2 - $lon1;
-                    $a = sin($dLat/2) * sin($dLat/2) + cos($lat1) * cos($lat2) * sin($dLon/2) * sin($dLon/2);
-                    $c = 2 * atan2(sqrt($a), sqrt(1-$a));
-                    $dist = 6371000 * $c;
-
+                    $a    = sin($dLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dLon / 2) ** 2;
+                    $dist = 6371000 * 2 * atan2(sqrt($a), sqrt(1 - $a));
                     if ($dist <= 300) {
                         $cercanas[] = $activa;
                     }
@@ -73,25 +99,112 @@ final class ReportController
             }
         }
 
-        if ($carnet !== '') {
-            $misReportes = \App\Models\Reporte::where('citizen_carnet', $carnet)
-                ->latest('updated_at')
-                ->limit(20)
-                ->get();
-        }
-
         return view('reports.index', [
-            'reports'            => $reports->items(),
-            'reportesPendientes' => $reportesPendientes,
-            'reportesRechazados' => $reportesRechazados,
-            'misReportes'        => $misReportes,
+            'inundacionesActivas'    => $inundacionesActivas,
+            'inundacionesTerminadas' => $inundacionesTerminadas,
+            'misReportes'            => $misReportes,
+            'reportesPendientes'     => $reportesPendientes,
+            'reportesRechazados'     => $reportesRechazados,
             'meta' => [
-                'current_page' => $reports->currentPage(),
-                'last_page'    => $reports->lastPage(),
+                'current_page' => $activasPaginator->currentPage(),
+                'last_page'    => $activasPaginator->lastPage(),
             ],
             'role' => $role,
         ]);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers de serialización (Eloquent → array plano para Blade)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Serializa una inundación ACTIVA con quórum dinámico (TTL 3h).
+     */
+    private function serializarActiva(Inundacion $i): array
+    {
+        $i->loadMissing(['reportesActivosTTL', 'reportes']);
+
+        $reportesActivos = $i->reportesActivosTTL->map(fn ($r) => [
+            'id'                   => $r->id,
+            'peso'                 => $r->peso,
+            'intensidad_propuesta' => $r->intensidad_propuesta,
+            'lat_reporte'          => $r->lat_reporte,
+            'long_reporte'         => $r->long_reporte,
+            'foto_path'            => $r->foto_path,
+            'estado_validacion'    => $r->estado_validacion,
+            'created_at'           => $r->created_at,
+            'created_at_human'     => $r->created_at?->diffForHumans(),
+        ])->toArray();
+
+        return [
+            'id'                   => $i->id,
+            'latitud'              => $i->latitud,
+            'longitud'             => $i->longitud,
+            'estado'               => $i->estado,
+            'created_at'           => $i->created_at,
+            'updated_at'           => $i->updated_at,
+            'address'              => $i->reportes->first()?->address,
+            'description'          => $i->reportes->first()?->description,
+            // Quórum dinámico — solo reportes últimas 3h, excluyendo rechazados
+            'quorum_total'         => $i->quorumTotal(),
+            'intensidad_calculada' => $i->intensidadCalculada(),
+            'esta_confirmada'      => $i->estaConfirmada(),
+            'desglose_puntos'      => $i->desgloseReportes($i->reportesActivosTTL),
+            'reportes_activos'     => $reportesActivos,
+        ];
+    }
+
+    /**
+     * Serializa una inundación TERMINADA con desglose histórico completo.
+     * La duración se calcula como: updated_at (cierre) − created_at (inicio).
+     */
+    private function serializarTerminada(Inundacion $i): array
+    {
+        $i->loadMissing('reportes');
+
+        $diff    = $i->created_at->diff($i->updated_at);
+        $horas   = ($diff->days * 24) + $diff->h;
+        $minutos = $diff->i;
+
+        $reportesVinculados = $i->reportes->map(fn ($r) => [
+            'id'                   => $r->id,
+            'peso'                 => $r->peso,
+            'intensidad_propuesta' => $r->intensidad_propuesta,
+            'lat_reporte'          => $r->lat_reporte,
+            'long_reporte'         => $r->long_reporte,
+            'foto_path'            => $r->foto_path,
+            'estado_validacion'    => $r->estado_validacion,
+            'created_at'           => $r->created_at,
+            'created_at_human'     => $r->created_at?->diffForHumans(),
+        ])->toArray();
+
+        $desglose       = $i->desgloseReportes($i->reportes);
+        $totalHistorico = array_sum($desglose);
+
+        return [
+            'id'                   => $i->id,
+            'latitud'              => $i->latitud,
+            'longitud'             => $i->longitud,
+            'estado'               => $i->estado,
+            'created_at'           => $i->created_at,
+            'updated_at'           => $i->updated_at,
+            'address'              => $i->reportes->first()?->address,
+            'description'          => $i->reportes->first()?->description,
+            // Desglose histórico (todos los reportes vinculados, sin TTL)
+            'desglose_historico'   => $desglose,
+            'quorum_historico'     => $totalHistorico,
+            'reportes_vinculados'  => $reportesVinculados,
+            // Duración de la inundación (inicio → cierre por autoridad)
+            'duracion_horas'       => $horas,
+            'duracion_minutos'     => $minutos,
+            'duracion_texto'       => "{$horas}h {$minutos}min",
+            'fecha_inicio'         => $i->created_at,
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Resto de acciones del controlador (sin cambios de lógica)
+    // ─────────────────────────────────────────────────────────────────────
 
     public function create(): View
     {
@@ -103,11 +216,10 @@ final class ReportController
         $token = (string) $request->session()->get('api_token', '');
 
         $data = $request->validate([
-            'latitud' => ['required', 'numeric', 'between:-90,90'],
-            'longitud' => ['required', 'numeric', 'between:-180,180'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'latitud'   => ['required', 'numeric', 'between:-90,90'],
+            'longitud'  => ['required', 'numeric', 'between:-180,180'],
+            'address'   => ['nullable', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'intensidad_actual' => ['required', 'string', 'in:baja,media,alta'],
             'provincia' => ['required', 'string'],
             'municipio' => ['required', 'string'],
         ]);
@@ -147,7 +259,7 @@ final class ReportController
 
         return view('reports.show', [
             'report' => $report,
-            'eta' => $this->calculateEta($report),
+            'eta'    => $this->calculateEta($report),
         ]);
     }
 
@@ -180,7 +292,7 @@ final class ReportController
         $token = (string) $request->session()->get('api_token', '');
 
         $data = $request->validate([
-            // Estados normalizados (Opción 2): 'activa' | 'terminada' | 'falsa'
+            // Estados normalizados: 'activa' | 'terminada' | 'falsa'
             'estado' => ['required', 'string', 'in:activa,terminada,falsa'],
         ]);
 
@@ -202,7 +314,6 @@ final class ReportController
 
     /**
      * Desactiva (termina) una inundación directamente desde el listado.
-     * Llama a la API con estado='terminada' y redirige de vuelta al index.
      */
     public function desactivar(Request $request, int|string $id): RedirectResponse
     {
@@ -225,18 +336,12 @@ final class ReportController
 
     public function latestForNotifications(Request $request): JsonResponse
     {
-        $user = (array) $request->session()->get('api_user', []);
-        $role = (string) ($user['role'] ?? '');
-        $carnet = (string) ($user['carnet'] ?? '');
-
-        // Solo consultamos inundaciones activas; terminadas y falsas no generan notificaciones.
-        $latest = Inundacion::where('estado', 'activa')->latest()->first();
+        $latest = Inundacion::activas()->latest()->first();
 
         if (! $latest) {
             return response()->json(['data' => null], 200);
         }
 
-        // intensidad_actual ya no existe en la BD; calculamos al vuelo.
         $latest->load('reportesActivosTTL');
 
         return response()->json([
@@ -251,8 +356,8 @@ final class ReportController
 
     public function notificationsFeed(Request $request): JsonResponse
     {
-        $user = (array) $request->session()->get('api_user', []);
-        $role = (string) ($user['role'] ?? '');
+        $user   = (array) $request->session()->get('api_user', []);
+        $role   = (string) ($user['role'] ?? '');
         $carnet = (string) ($user['carnet'] ?? '');
 
         if ($role === 'authority') {
@@ -270,14 +375,14 @@ final class ReportController
                     $cursor = (((int) optional($reporte->updated_at)->timestamp) * 100000) + (int) $reporte->id;
 
                     return [
-                        'id' => 'authority-pending-'.$reporte->id.'-'.(int) optional($reporte->updated_at)->timestamp,
-                        'cursor' => $cursor,
-                        'title' => $isUpdated ? 'Reporte pendiente actualizado' : 'Nuevo reporte pendiente',
-                        'message' => $isUpdated
-                            ? 'El reporte #'.$reporte->id.' fue actualizado y sigue pendiente de validacion.'
-                            : 'El reporte #'.$reporte->id.' requiere validacion de autoridad.',
+                        'id'         => 'authority-pending-' . $reporte->id . '-' . (int) optional($reporte->updated_at)->timestamp,
+                        'cursor'     => $cursor,
+                        'title'      => $isUpdated ? 'Reporte pendiente actualizado' : 'Nuevo reporte pendiente',
+                        'message'    => $isUpdated
+                            ? 'El reporte #' . $reporte->id . ' fue actualizado y sigue pendiente de validacion.'
+                            : 'El reporte #' . $reporte->id . ' requiere validacion de autoridad.',
                         'created_at' => optional($reporte->updated_at)?->toIso8601String(),
-                        'link' => route('reports.index', [], false),
+                        'link'       => route('reports.index', [], false),
                     ];
                 })
                 ->values()
@@ -290,7 +395,7 @@ final class ReportController
             return response()->json(['data' => []]);
         }
 
-        $items = [];
+        $items   = [];
         $reportes = Reporte::query()
             ->with('inundacion')
             ->where('citizen_carnet', $carnet)
@@ -301,36 +406,36 @@ final class ReportController
         foreach ($reportes as $reporte) {
             if ($reporte->estado_validacion === Reporte::VALIDACION_RECHAZADO) {
                 $items[] = [
-                    'id' => 'citizen-rejected-'.$reporte->id,
-                    'cursor' => (int) optional($reporte->updated_at)->timestamp,
-                    'title' => 'Reporte rechazado',
-                    'message' => 'Tu reporte #'.$reporte->id.' fue rechazado por una autoridad.',
+                    'id'         => 'citizen-rejected-' . $reporte->id,
+                    'cursor'     => (int) optional($reporte->updated_at)->timestamp,
+                    'title'      => 'Reporte rechazado',
+                    'message'    => 'Tu reporte #' . $reporte->id . ' fue rechazado por una autoridad.',
                     'created_at' => optional($reporte->updated_at)?->toIso8601String(),
-                    'link' => route('reports.index', [], false),
+                    'link'       => route('reports.index', [], false),
                 ];
             }
 
             if ($reporte->estado_validacion === Reporte::VALIDACION_ACEPTADO && $reporte->inundacion_id !== null) {
                 $items[] = [
-                    'id' => 'citizen-accepted-'.$reporte->id,
-                    'cursor' => (int) optional($reporte->updated_at)->timestamp,
-                    'title' => 'Reporte atendido',
-                    'message' => 'Tu reporte #'.$reporte->id.' fue atendido y vinculado a una inundacion.',
+                    'id'         => 'citizen-accepted-' . $reporte->id,
+                    'cursor'     => (int) optional($reporte->updated_at)->timestamp,
+                    'title'      => 'Reporte atendido',
+                    'message'    => 'Tu reporte #' . $reporte->id . ' fue atendido y vinculado a una inundacion.',
                     'created_at' => optional($reporte->updated_at)?->toIso8601String(),
-                    'link' => route('reports.index', [], false),
+                    'link'       => route('reports.index', [], false),
                 ];
             }
 
             if ($reporte->inundacion !== null && in_array($reporte->inundacion->estado, [Inundacion::ESTADO_TERMINADA, Inundacion::ESTADO_FALSA], true)) {
-                $estado = (string) $reporte->inundacion->estado;
+                $estado    = (string) $reporte->inundacion->estado;
                 $changedAt = $reporte->inundacion->updated_at ?? $reporte->updated_at;
-                $items[] = [
-                    'id' => 'citizen-status-'.$reporte->id.'-'.$estado,
-                    'cursor' => (int) optional($changedAt)->timestamp,
-                    'title' => 'Estado de inundacion actualizado',
-                    'message' => 'La inundacion asociada a tu reporte #'.$reporte->id.' cambio a estado "'.$estado.'".',
+                $items[]   = [
+                    'id'         => 'citizen-status-' . $reporte->id . '-' . $estado,
+                    'cursor'     => (int) optional($changedAt)->timestamp,
+                    'title'      => 'Estado de inundacion actualizado',
+                    'message'    => 'La inundacion asociada a tu reporte #' . $reporte->id . ' cambio a estado "' . $estado . '".',
                     'created_at' => optional($changedAt)?->toIso8601String(),
-                    'link' => route('reports.index', [], false),
+                    'link'       => route('reports.index', [], false),
                 ];
             }
         }
@@ -341,6 +446,10 @@ final class ReportController
             'data' => array_slice($items, 0, 10),
         ]);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers privados de distancia y ETA
+    // ─────────────────────────────────────────────────────────────────────
 
     /**
      * @param array<string, mixed> $report
@@ -364,7 +473,7 @@ final class ReportController
             return null;
         }
 
-        $closest = null;
+        $closest       = null;
         $minDistanceKm = INF;
 
         foreach (CentroAsistencia::query()->get(['id_centro', 'nombre', 'latitud', 'longitud']) as $centro) {
@@ -378,21 +487,21 @@ final class ReportController
             $distanceKm = $this->haversineKm($reportLat, $reportLng, $centerLat, $centerLng);
             if ($distanceKm < $minDistanceKm) {
                 $minDistanceKm = $distanceKm;
-                $closest = $centro;
+                $closest       = $centro;
             }
         }
 
-        if ($closest === null || !is_finite($minDistanceKm)) {
+        if ($closest === null || ! is_finite($minDistanceKm)) {
             return null;
         }
 
-        $speedKmH = 35.0;
+        $speedKmH  = 35.0;
         $etaMinutes = (int) max(3, ceil(($minDistanceKm / $speedKmH) * 60));
 
         return [
-            'name' => (string) ($closest->nombre ?? 'Centro de asistencia'),
-            'distance_km' => round($minDistanceKm, 2),
-            'eta_minutes' => $etaMinutes,
+            'name'         => (string) ($closest->nombre ?? 'Centro de asistencia'),
+            'distance_km'  => round($minDistanceKm, 2),
+            'eta_minutes'  => $etaMinutes,
         ];
     }
 
@@ -415,8 +524,8 @@ final class ReportController
         $earthRadiusKm = 6371.0;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat / 2) ** 2
-            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+        $a    = sin($dLat / 2) ** 2
+              + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
 
         return $earthRadiusKm * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }

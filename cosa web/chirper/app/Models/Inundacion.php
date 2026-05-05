@@ -159,4 +159,37 @@ class Inundacion extends Model
     {
         return $query->where('estado', self::ESTADO_ACTIVA);
     }
+
+    /**
+     * Scope: solo inundaciones terminadas (historial).
+     */
+    public function scopeTerminadas(Builder $query): Builder
+    {
+        return $query->where('estado', self::ESTADO_TERMINADA);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers de desglose
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Construye el desglose de puntos por categoría de intensidad
+     * a partir de cualquier colección de reportes.
+     *
+     * @param  \Illuminate\Support\Collection  $reportes
+     * @return array{alta: int, media: int, baja: int}
+     */
+    public function desgloseReportes(\Illuminate\Support\Collection $reportes): array
+    {
+        $desglose = ['alta' => 0, 'media' => 0, 'baja' => 0];
+
+        foreach ($reportes as $rep) {
+            $cat = $rep->intensidad_propuesta;
+            if (array_key_exists($cat, $desglose)) {
+                $desglose[$cat] += (int) $rep->peso;
+            }
+        }
+
+        return $desglose;
+    }
 }

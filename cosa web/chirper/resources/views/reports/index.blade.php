@@ -69,11 +69,12 @@
     @endif
 
     {{-- ══════════════════════════════════════════════════════════════════
-         TABLA: Inundaciones Activas / Pasadas
+         TABLA: Inundaciones Activas
     ══════════════════════════════════════════════════════════════════ --}}
-    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm mb-10">
-        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <h2 class="text-lg font-medium text-gray-900">Inundaciones Activas / Pasadas</h2>
+    <div class="overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm mb-10">
+        <div class="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <h2 class="text-lg font-medium text-blue-900">Inundaciones Activas</h2>
+            <span class="text-xs font-medium text-blue-600">{{ count($inundacionesActivas) }} evento(s)</span>
         </div>
         <table class="w-full text-sm">
             <thead class="bg-gray-50 text-gray-700">
@@ -87,7 +88,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-                @forelse ($reports as $inundacion)
+                @forelse ($inundacionesActivas as $inundacion)
                     @php($id = data_get($inundacion, 'id'))
                     @php($estado = data_get($inundacion, 'estado', ''))
                     @php($int = data_get($inundacion, 'intensidad_calculada', null))
@@ -114,10 +115,17 @@
                             </span>
                         </td>
                         <td class="px-3 py-2">
-                            <span class="{{ $confirmada ? 'text-green-700 font-semibold' : 'text-gray-500' }}">
-                                {{ $quorum }} pts
-                                @if($confirmada) ✓ @endif
-                            </span>
+                            @php($desglosePts = data_get($inundacion, 'desglose_puntos', ['alta'=>0,'media'=>0,'baja'=>0]))
+                            <div class="flex flex-col gap-1">
+                                <span class="{{ $confirmada ? 'text-green-700 font-semibold' : 'text-gray-500' }} text-xs">
+                                    Total: {{ $quorum }} pts @if($confirmada) ✓ @endif
+                                </span>
+                                <div class="flex items-center gap-1 flex-wrap">
+                                    <span class="bg-red-100 text-red-700 rounded px-1.5 py-0.5 text-xs font-medium">Alta: {{ $desglosePts['alta'] }}pts</span>
+                                    <span class="bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5 text-xs font-medium">Media: {{ $desglosePts['media'] }}pts</span>
+                                    <span class="bg-green-100 text-green-700 rounded px-1.5 py-0.5 text-xs font-medium">Baja: {{ $desglosePts['baja'] }}pts</span>
+                                </div>
+                            </div>
                         </td>
                         <td class="px-3 py-2">{{ data_get($inundacion, 'created_at', '') ? \Carbon\Carbon::parse(data_get($inundacion, 'created_at'))->format('d/m/Y H:i') : '' }}</td>
                         <td class="px-3 py-2 text-right" onclick="event.stopPropagation()">
@@ -330,7 +338,89 @@
         </div>
     </div>
 
+    {{-- ══════════════════════════════════════════════════════════════════
+         PANEL: Inundaciones Terminadas (Historial)
+    ══════════════════════════════════════════════════════════════════ --}}
     @endif {{-- end authority --}}
+
+    <div class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm mt-8">
+        <div class="px-4 py-3 bg-gray-100 border-b border-gray-300 flex items-center justify-between">
+            <h2 class="text-lg font-medium text-gray-700">Inundaciones Terminadas (Historial)</h2>
+            <span class="text-xs font-medium text-gray-500">{{ count($inundacionesTerminadas) }} evento(s)</span>
+        </div>
+        @forelse ($inundacionesTerminadas as $term)
+            @php($tid = data_get($term, 'id'))
+            @php($desglose = data_get($term, 'desglose_historico', ['alta'=>0,'media'=>0,'baja'=>0]))
+            @php($totalQ = data_get($term, 'quorum_historico', 0))
+            @php($intGanadora = $desglose['alta'] >= $desglose['media'] && $desglose['alta'] >= $desglose['baja'] ? 'alta' : ($desglose['media'] >= $desglose['baja'] ? 'media' : 'baja'))
+            <div class="border-b border-gray-200 last:border-0">
+                {{-- Fila principal clicable --}}
+                <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                     onclick="toggleDetails('term-{{ $tid }}')">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-gray-700">#{{ $tid }}</span>
+                        {{-- Intensidad ganadora histórica --}}
+                        @if($totalQ > 0)
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                                {{ $intGanadora === 'alta' ? 'bg-red-100 text-red-700' : ($intGanadora === 'media' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700') }}">
+                                {{ ucfirst($intGanadora) }}
+                            </span>
+                        @else
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-400">Sin reportes</span>
+                        @endif
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-600">Terminada</span>
+                    </div>
+                    <div class="flex items-center gap-6 text-xs text-gray-500">
+                        {{-- División Quórum --}}
+                        <div class="hidden sm:flex items-center gap-1">
+                            <span class="bg-red-100 text-red-700 rounded px-1.5 py-0.5 font-medium">Alta: {{ $desglose['alta'] }}pts</span>
+                            <span class="bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5 font-medium">Media: {{ $desglose['media'] }}pts</span>
+                            <span class="bg-green-100 text-green-700 rounded px-1.5 py-0.5 font-medium">Baja: {{ $desglose['baja'] }}pts</span>
+                        </div>
+                        {{-- Duración --}}
+                        <div class="flex flex-col items-end">
+                            <span class="font-semibold text-gray-600">{{ data_get($term, 'duracion_texto', '—') }}</span>
+                            <span class="text-gray-400">Inicio: {{ data_get($term, 'fecha_inicio') ? \Carbon\Carbon::parse(data_get($term, 'fecha_inicio'))->format('d/m/Y H:i') : '—' }}</span>
+                        </div>
+                        <span class="text-gray-400">▼</span>
+                    </div>
+                </div>
+                {{-- Detalles colapsables: reportes vinculados --}}
+                <div id="details-term-{{ $tid }}" class="hidden bg-gray-50 px-6 pb-4 pt-2">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Reportes Vinculados ({{ count(data_get($term, 'reportes_vinculados', [])) }})</h4>
+                    {{-- Desglose visual en móvil --}}
+                    <div class="flex gap-2 mb-3 sm:hidden">
+                        <span class="bg-red-100 text-red-700 rounded px-2 py-1 text-xs font-medium">Alta: {{ $desglose['alta'] }}pts</span>
+                        <span class="bg-yellow-100 text-yellow-700 rounded px-2 py-1 text-xs font-medium">Media: {{ $desglose['media'] }}pts</span>
+                        <span class="bg-green-100 text-green-700 rounded px-2 py-1 text-xs font-medium">Baja: {{ $desglose['baja'] }}pts</span>
+                    </div>
+                    @php($repsVinc = data_get($term, 'reportes_vinculados', []))
+                    @if(count($repsVinc) > 0)
+                        <ul class="space-y-1">
+                            @foreach($repsVinc as $rv)
+                                <li class="flex items-center gap-2 text-xs text-gray-600">
+                                    <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium
+                                        {{ $rv['intensidad_propuesta'] === 'alta' ? 'bg-red-100 text-red-700' : ($rv['intensidad_propuesta'] === 'media' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700') }}">
+                                        {{ ucfirst($rv['intensidad_propuesta']) }}
+                                    </span>
+                                    <span>GPS: {{ $rv['lat_reporte'] }}, {{ $rv['long_reporte'] }}</span>
+                                    <span class="font-medium text-gray-500">({{ $rv['peso'] }}pts)</span>
+                                    @if(!empty($rv['foto_path']))
+                                        <span class="text-blue-500">📷</span>
+                                    @endif
+                                    <span class="ml-auto text-gray-400">{{ $rv['created_at_human'] ?? '' }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-xs text-gray-400">No hay reportes vinculados.</p>
+                    @endif
+                </div>
+            </div>
+        @empty
+            <p class="text-gray-500 text-center py-6 text-sm">No hay inundaciones terminadas en el historial.</p>
+        @endforelse
+    </div>
 
     <script>
         function toggleDetails(id) {
@@ -375,27 +465,55 @@
                 const pendingReports = @json($reportesPendientes);
 
                 pendingReports.forEach(rep => {
-                    const lat = parseFloat(rep.lat_gps);
-                    const lng = parseFloat(rep.long_gps);
-                    const mapId = 'minimap-' + rep.id;
+                    // Punto 1: Ubicación GPS del usuario (origen)
+                    const latGps  = parseFloat(rep.lat_gps);
+                    const lngGps  = parseFloat(rep.long_gps);
+                    // Punto 2: Ubicación del reporte marcado por el usuario
+                    const latRep  = parseFloat(rep.lat_reporte);
+                    const lngRep  = parseFloat(rep.long_reporte);
+                    const mapId   = 'minimap-' + rep.id;
 
-                    if (document.getElementById(mapId)) {
-                        const map = L.map(mapId, {
-                            zoomControl: false,
-                            attributionControl: false
-                        }).setView([lat, lng], 15);
+                    if (!document.getElementById(mapId)) return;
 
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    // Centrar en el punto del REPORTE (punto 2)
+                    const map = L.map(mapId, {
+                        zoomControl: false,
+                        attributionControl: false
+                    }).setView([latRep, lngRep], 15);
 
-                        const customIcon = L.divIcon({
-                            className: 'custom-leaflet-marker',
-                            html: '<div style="background-color: #F59E0B; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>',
-                            iconSize: [14, 14],
-                            iconAnchor: [7, 7]
-                        });
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-                        L.marker([lat, lng], { icon: customIcon }).addTo(map);
-                    }
+                    // ── Punto 1: GPS del usuario — ámbar semitransparente ──
+                    const iconGps = L.divIcon({
+                        className: '',
+                        html: '<div style="background-color: rgba(245,158,11,0.45); width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(245,158,11,0.7); box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>',
+                        iconSize: [14, 14],
+                        iconAnchor: [7, 7]
+                    });
+                    L.marker([latGps, lngGps], { icon: iconGps })
+                        .bindTooltip('Ubicación GPS del usuario', { direction: 'top', offset: [0, -8] })
+                        .addTo(map);
+
+                    // ── Radio 500 m alrededor del GPS — círculo azul ──
+                    L.circle([latGps, lngGps], {
+                        radius: 500,
+                        color: '#3B82F6',
+                        fillColor: '#3B82F6',
+                        fillOpacity: 0.08,
+                        weight: 1.5,
+                        dashArray: '4 4'
+                    }).addTo(map);
+
+                    // ── Punto 2: Ubicación del reporte — rojo intenso ──
+                    const iconRep = L.divIcon({
+                        className: '',
+                        html: '<div style="background-color: #EF4444; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 0 6px rgba(239,68,68,0.7);"></div>',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    });
+                    L.marker([latRep, lngRep], { icon: iconRep })
+                        .bindTooltip('Punto reportado', { direction: 'top', offset: [0, -9] })
+                        .addTo(map);
                 });
             @endif
         });

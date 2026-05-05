@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\LogisticsController;
+use App\Http\Controllers\VictimaController;
 use App\Http\Middleware\ApiAuthenticate;
 use App\Http\Middleware\EnsureApiAuthority;
 use App\Http\Middleware\RedirectIfApiAuthenticated;
@@ -30,6 +31,7 @@ Route::get('/reporte-rapido', function () {
     $activas = \App\Models\Inundacion::where('estado', 'activa')->get(['id', 'latitud', 'longitud']);
     return view('reports.rapido', ['inundacionesActivas' => $activas]);
 })->name('reports.rapido');
+
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/maps', [MapController::class, 'index'])->name('maps.index');
@@ -40,17 +42,30 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::middleware(EnsureApiAuthority::class)->group(function () {
         Route::post('/reports/{id}/responses', [ReportController::class, 'storeResponse'])->name('reports.responses.store');
         Route::post('/reports/{id}/status', [ReportController::class, 'updateestado'])->name('reports.status.update');
-        // Ruta directa para desactivar una inundación desde el listado
         Route::post('/reports/{id}/desactivar', [ReportController::class, 'desactivar'])->name('reports.desactivar');
         Route::get('/reports/notifications/latest', [ReportController::class, 'latestForNotifications'])->name('reports.notifications.latest');
     });
 
-    // Rutas de Logística (Centros de Asistencia)
+    // ── Logística (Centros de Asistencia) ────────────────────────────────
     Route::get('/logistica', [LogisticsController::class, 'index'])->name('logistica.index');
-    
+
+    // ── Módulo de Víctimas ────────────────────────────────────────────────
+    // Las rutas GET con segmentos estáticos deben ir ANTES de la ruta con {id}
+    Route::get('/victimas', [VictimaController::class, 'index'])->name('victimas.index');
+    Route::get('/victimas/create', [VictimaController::class, 'create'])->name('victimas.create');
+    Route::get('/victimas/{id}', [VictimaController::class, 'show'])->name('victimas.show')->where('id', '[0-9]+');
+
+    // Operaciones de escritura — solo autoridad
     Route::middleware(EnsureApiAuthority::class)->group(function () {
+        // Logística
         Route::post('/logistica', [LogisticsController::class, 'store'])->name('logistica.store');
         Route::patch('/logistica/{id}', [LogisticsController::class, 'update'])->name('logistica.update');
         Route::delete('/logistica/{id}', [LogisticsController::class, 'destroy'])->name('logistica.destroy');
+
+        // Víctimas — CRUD completo
+        Route::post('/victimas', [VictimaController::class, 'store'])->name('victimas.store');
+        Route::get('/victimas/{id}/edit', [VictimaController::class, 'edit'])->name('victimas.edit')->where('id', '[0-9]+');
+        Route::put('/victimas/{id}', [VictimaController::class, 'update'])->name('victimas.update')->where('id', '[0-9]+');
+        Route::delete('/victimas/{id}', [VictimaController::class, 'destroy'])->name('victimas.destroy')->where('id', '[0-9]+');
     });
 });

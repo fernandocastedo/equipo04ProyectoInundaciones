@@ -65,6 +65,14 @@ class Inundacion extends Model
         return $this->hasMany(Reporte::class, 'inundacion_id');
     }
 
+    /**
+     * Víctimas registradas en esta inundación.
+     */
+    public function victimas(): HasMany
+    {
+        return $this->hasMany(Victima::class, 'inundacion_id');
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Cómputo dinámico de Quórum
     // ─────────────────────────────────────────────────────────────────────

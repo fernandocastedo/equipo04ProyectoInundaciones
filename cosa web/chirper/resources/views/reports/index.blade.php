@@ -228,6 +228,10 @@
                             </div>
                             <p class="text-sm text-gray-600 mt-1">Intensidad Propuesta: <span class="font-bold text-orange-600">{{ ucfirst($rep->intensidad_propuesta) }}</span></p>
                             <p class="text-xs text-gray-500 mt-1">Ubicación GPS: {{ $rep->lat_gps }}, {{ $rep->long_gps }}</p>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <span class="font-semibold text-gray-700">Descripción:</span>
+                                {{ !empty($rep->description) ? $rep->description : 'Sin descripción.' }}
+                            </p>
                             @if(!empty($rep->foto_path))
                                 <div class="mt-3">
                                     <p class="text-xs text-gray-500 mb-1">Evidencia fotográfica:</p>

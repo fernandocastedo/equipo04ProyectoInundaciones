@@ -156,6 +156,72 @@
 
         @yield('content')
     </main>
+
+    <!-- Global Image Modal -->
+    <div id="global-image-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black bg-opacity-85 backdrop-blur-sm transition-all duration-300" style="display: none;">
+        <button id="global-image-modal-close" class="absolute top-4 right-4 text-white text-5xl font-light hover:text-gray-300 focus:outline-none transition-colors select-none cursor-pointer" aria-label="Cerrar">&times;</button>
+        <div class="relative max-w-4xl max-h-[90vh] p-4 flex items-center justify-center">
+            <img id="global-image-modal-img" src="" alt="Vista ampliada" class="max-w-full max-h-[85vh] rounded-lg shadow-2xl border border-gray-800 transform scale-95 transition-all duration-300 object-contain">
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('global-image-modal');
+        const modalImg = document.getElementById('global-image-modal-img');
+        const modalClose = document.getElementById('global-image-modal-close');
+
+        if (modal && modalImg && modalClose) {
+            document.addEventListener('click', function(e) {
+                const trigger = e.target.closest('.clickable-image');
+                if (trigger) {
+                    let src = '';
+                    if (trigger.tagName === 'IMG') {
+                        src = trigger.getAttribute('src');
+                    } else if (trigger.tagName === 'A') {
+                        e.preventDefault();
+                        src = trigger.getAttribute('href');
+                    }
+
+                    if (src) {
+                        modalImg.src = src;
+                        modal.style.display = 'flex';
+                        modal.classList.remove('hidden');
+                        setTimeout(() => {
+                            modal.classList.remove('opacity-0');
+                            modalImg.classList.remove('scale-95');
+                            modalImg.classList.add('scale-100');
+                        }, 10);
+                    }
+                }
+            });
+
+            const closeModal = function() {
+                modalImg.classList.remove('scale-100');
+                modalImg.classList.add('scale-95');
+                modal.classList.add('opacity-0');
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                    modal.classList.add('hidden');
+                    modalImg.src = '';
+                }, 300);
+            };
+
+            modalClose.addEventListener('click', closeModal);
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal || e.target.closest('#global-image-modal-close')) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    closeModal();
+                }
+            });
+        }
+    });
+    </script>
 </body>
 
 <script>

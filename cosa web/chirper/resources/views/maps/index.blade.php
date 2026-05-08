@@ -74,9 +74,10 @@
                 if (isNaN(lat) || isNaN(lng)) return;
 
                 let markerColor = "#4285F4"; // Default Blue
-                if (report.intensidad_actual === 'high') markerColor = "#EA4335"; // Red
-                if (report.intensidad_actual === 'medium') markerColor = "#FBBC05"; // Yellow
-                if (report.intensidad_actual === 'low') markerColor = "#34A853"; // Green
+                const severidad = report.intensidad_calculada || 'baja';
+                if (severidad === 'alta') markerColor = "#EA4335"; // Red
+                if (severidad === 'media') markerColor = "#FBBC05"; // Yellow
+                if (severidad === 'baja') markerColor = "#34A853"; // Green
 
                 const customIcon = L.divIcon({
                     className: 'custom-leaflet-marker',
@@ -85,11 +86,14 @@
                     iconAnchor: [10, 10]
                 });
 
+                const desc = report.description || 'Sin descripción.';
+                const shortDesc = desc.substring(0, 100) + (desc.length > 100 ? '...' : '');
+
                 const contentStr = `
                     <div class="max-w-xs">
-                        <p class="font-semibold text-sm mb-1">${report.description.substring(0, 100) + (report.description.length > 100 ? '...' : '')}</p>
-                        <p class="text-xs text-gray-600 mb-2"><b>Severidad:</b> ${report.intensidad_actual} | <b>Estado:</b> ${report.estado}</p>
-                        <a href="/reports/${report.id}" class="text-xs text-blue-600 hover:underline">Ver detalle completo ?</a>
+                        <p class="font-semibold text-sm mb-1">${shortDesc}</p>
+                        <p class="text-xs text-gray-600 mb-2"><b>Severidad:</b> ${severidad} | <b>Estado:</b> ${report.estado}</p>
+                        <a href="/reports/${report.id}" class="text-xs text-blue-600 hover:underline">Ver detalle completo &rarr;</a>
                     </div>
                 `;
                 

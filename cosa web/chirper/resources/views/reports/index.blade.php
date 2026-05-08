@@ -234,12 +234,10 @@
                             </p>
                             @if(!empty($rep->foto_path))
                                 <div class="mt-3">
-                                    <p class="text-xs text-gray-500 mb-1">Evidencia fotográfica:</p>
-                                    <a href="{{ asset('storage/' . $rep->foto_path) }}" target="_blank" rel="noopener noreferrer" class="inline-block">
-                                        <img src="{{ asset('storage/' . $rep->foto_path) }}"
-                                             alt="Foto del reporte #{{ $rep->id }}"
-                                             class="w-28 h-28 object-cover rounded border border-orange-200 hover:opacity-90 transition">
-                                    </a>
+                                    <p class="text-xs text-gray-500 mb-1">Evidencia fotográfica (clic para ampliar):</p>
+                                    <img src="{{ asset('storage/' . $rep->foto_path) }}"
+                                         alt="Foto del reporte #{{ $rep->id }}"
+                                         class="clickable-image w-28 h-28 object-cover rounded border border-orange-200 hover:opacity-90 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md">
                                 </div>
                             @endif
                         </div>
@@ -291,7 +289,8 @@
                         @if($rep->foto_path)
                             <img src="{{ asset('storage/' . $rep->foto_path) }}"
                                  alt="Foto del reporte #{{ $rep->id }}"
-                                 class="w-24 h-24 object-cover">
+                                 class="clickable-image w-24 h-24 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                 title="Clic para ampliar">
                         @else
                             <div class="text-center p-2">
                                 <span class="text-gray-400 text-2xl block">📷</span>

@@ -34,11 +34,12 @@ class InundacionController extends Controller
             });
         }
 
-        // Eager-load la relación filtrada por TTL para calcular quórum
+        // Eager-load la relación filtrada por TTL para calcular quórum,
+        // la relación validador, y la relación reportes para dirección/descripción
         // sin disparar N+1 queries al serializar el resource.
         $reports = $query
-            ->with(['validador', 'reportesActivosTTL'])
-            ->paginate(15);
+            ->with(['validador', 'reportes', 'reportesActivosTTL'])
+            ->get();
 
         return InundacionResource::collection($reports);
     }

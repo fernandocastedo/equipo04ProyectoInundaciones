@@ -28,7 +28,8 @@
                 @if ($victima->foto_path)
                     <img src="{{ asset('storage/' . $victima->foto_path) }}"
                          alt="Foto de {{ $victima->nombre_completo }}"
-                         class="w-32 h-32 sm:w-40 sm:h-40 rounded-xl object-cover border-2 border-gray-200 shadow-md">
+                         class="clickable-image w-32 h-32 sm:w-40 sm:h-40 rounded-xl object-cover border-2 border-gray-200 shadow-md cursor-pointer hover:opacity-95 transition-all duration-200"
+                         title="Clic para ampliar">
                 @else
                     <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-xl bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-300" viewBox="0 0 20 20" fill="currentColor">

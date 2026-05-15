@@ -1,0 +1,26 @@
+Regiones de Santa Cruz
+
+Santa Cruz tiene 7 regiones: Chaco Cruceño, Chiquitanía, Gurayos, Metropolitana, Norte Integrado, Pantanal, Valles
+
+
+Metropolitana: Santa Cruz de la Sierra, Cotoca, El Torno, La Guardia, Porongo, Warnes.
+Valles	Samaipata, Mairana, Quirusillas, Postrervalle, Pampa Grande, El Trigal, Comarapa, Saipina, Moro Moro, Pucará, Vallegrande.
+
+Chaco Cruceño: Boyuibe, Cabezas, Camiri, Cuevo, Charagua, Lagunillas.
+
+Chiquitanía: Pailón, San Julián, Concepción, Cuatro Cañadas, Roboré, San Miguel, San Rafael, San Ramón, San José, San Ignacio, San Javier.
+
+Pantanal: El Carmen Rivero Torrez, Puerto Quijarro, Puerto Suárez, San Matías.
+
+Norte Integrado: Montero, Mineros, Saavedra, Fernández Alonso, San Pedro, Yapacaní, San Juan, San Carlos, Santa Rosa, Colpa Bélgica.
+
+Valles: Samaipata, Mairana, Quirusillas, Postrervalle, Pampa Grande, El Trigal, Comarapa, Saipina, Moro Moro, Pucará, Vallegrande.
+
+Chaco Cruceño: Boyuibe, Cabezas, Camiri, Cuevo, Charagua, Lagunillas.
+
+Chiquitania: Pailón, San Julián, Concepción, Cuatro Cañadas, Roboré, San Miguel, San Rafael, San Ramón, San José, San Ignacio, San Javier.
+
+Pantanal: El Carmen Rivero Torrez, Puerto Quijarro, Puerto Suárez, San Matías.
+
+Norte Integrado: Montero, Mineros, Saavedra, Fernández Alonso, San Pedro, Yapacaní, San Juan, San Carlos, Santa Rosa, Colpa Bélgica.
+

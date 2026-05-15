@@ -623,7 +623,7 @@
             //      (naranja para provincia, rojo para municipio)
             // ─────────────────────────────────────────────────────────────
             window.addEventListener('locationFilterChanged', function (e) {
-                const { idPrefix, provincia, municipio, estado, nombre } = e.detail;
+                const { idPrefix, region, provincia, municipio, estado, nombre } = e.detail;
                 let filteredCentros = window.centros;
 
                 // Normalización para comparación: minúsculas y sin espacios extra
@@ -635,6 +635,10 @@
                 if (idPrefix === 'filter') {
                     filteredCentros = window.centros.filter(c => {
                         // Comparación case-insensitive: el valor del dropdown y el de la BD pueden tener distinta capitalización
+                        if (region && window.geographicData && window.geographicData.regiones) {
+                            const regData = window.geographicData.regiones.find(rg => rg.nombre === region);
+                            if (regData && c.municipio && !regData.municipios.includes(c.municipio)) return false;
+                        }
                         if (provF  && (c.provincia  || '').toLowerCase().trim() !== provF)  return false;
                         if (muniF  && (c.municipio  || '').toLowerCase().trim() !== muniF)  return false;
                         if (estado && estado === 'abierto' && c.is_open === false) return false;
@@ -655,6 +659,12 @@
                         const dEst  = tr.dataset.estado;
                         const dNom  = (tr.dataset.nombre || '').toLowerCase();
                         let show = true;
+                        
+                        if (region && window.geographicData && window.geographicData.regiones) {
+                            const regData = window.geographicData.regiones.find(rg => rg.nombre === region);
+                            if (regData && dMun && !regData.municipios.some(rm => rm.toLowerCase() === dMun)) show = false;
+                        }
+
                         if (provF  && dProv !== provF)  show = false;
                         if (muniF  && dMun  !== muniF)  show = false;
                         if (estado && estado !== dEst)  show = false;
@@ -671,6 +681,8 @@
                             titleEl.textContent = `Directorio de Centros Registrados en ${municipio}`;
                         } else if (provincia) {
                             titleEl.textContent = `Directorio de Centros Registrados en ${provincia}`;
+                        } else if (region) {
+                            titleEl.textContent = `Directorio de Centros Registrados en ${region}`;
                         } else {
                             titleEl.textContent = 'Directorio de Centros Registrados';
                         }
@@ -714,6 +726,22 @@
                             interactive: false
                         }).addTo(map);
                         map.fitBounds(highlightLayer.getBounds());
+                    }
+                } else if (region && window.geographicData && municipalitiesData) {
+                    // Buscar los polígonos de todos los municipios de la región (púrpura #8B5CF6)
+                    const regData = window.geographicData.regiones.find(rg => rg.nombre === region);
+                    if (regData && regData.municipios) {
+                        const features = municipalitiesData.features.filter(f => {
+                            const mName = window.normalizeMuniName(f.properties.name);
+                            return regData.municipios.some(rm => rm.toLowerCase() === mName);
+                        });
+                        if (features.length > 0) {
+                            highlightLayer = L.geoJSON(features, {
+                                style: { color: '#8B5CF6', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
+                                interactive: false
+                            }).addTo(map);
+                            map.fitBounds(highlightLayer.getBounds());
+                        }
                     }
                 } else if (idPrefix === 'filter' && filteredCentros && filteredCentros.length > 0) {
                     // Si limpiaron todo, restablecer vista

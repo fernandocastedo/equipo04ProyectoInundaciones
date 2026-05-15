@@ -127,17 +127,16 @@
         // -------------------------------------------------------------
         // EVENTO CENTRAL DE FILTRADO: locationFilterChanged
         // -------------------------------------------------------------
-        // Igual al de logistics, pero m�s simple: solo filtra los marcadores
-        // de reportes y actualiza la capa de resaltado geogr�fico.
-        // No hay filtro de "Estado" (abierto/cerrado) porque es de centros de acopio.
         window.addEventListener('locationFilterChanged', function(e) {
-            const { idPrefix, provincia, municipio } = e.detail;
+            const { idPrefix, region, provincia, municipio } = e.detail;
             
             // Filtrado local SPA para reportes de inundación
             if (idPrefix === 'filter') {
                 const filtered = window.floodReports.filter(r => {
-                    // Si el backend no envi� provincia, no podemos filtrar perfecto localmente,
-                    // pero asumiendo que FloodReport Resource s� lo expone:
+                    if (region && window.geographicData && window.geographicData.regiones) {
+                        const regData = window.geographicData.regiones.find(rg => rg.nombre === region);
+                        if (regData && r.municipio && !regData.municipios.includes(r.municipio)) return false;
+                    }
                     if (provincia && r.provincia && r.provincia !== provincia) return false;
                     if (municipio && r.municipio && r.municipio !== municipio) return false;
                     return true;
@@ -151,7 +150,7 @@
             }
 
             if (municipio && municipalitiesData) {
-                // Buscar el pol�gono del municipio seleccionado (rojo #EF4444)
+                // Buscar el polígono del municipio seleccionado (rojo #EF4444)
                 // normalizeMuniName traduce el nombre crudo del GeoJSON ("Municipio Warnes")
                 // al formato oficial limpio ("warnes") para compararlo con el valor del filtro.
                 const feature = municipalitiesData.features.find(f => window.normalizeMuniName(f.properties.name) === municipio.toLowerCase());
@@ -163,8 +162,8 @@
                     map.fitBounds(highlightLayer.getBounds());
                 }
             } else if (provincia && provincesData) {
-                // Buscar el pol�gono de la provincia seleccionada (naranja #F97316)
-                // normalizeProvName maneja aliases como "Velasco" ? "Jos� Miguel de Velasco"
+                // Buscar el polígono de la provincia seleccionada (naranja #F97316)
+                // normalizeProvName maneja aliases como "Velasco" ? "José Miguel de Velasco"
                 const feature = provincesData.features.find(f => window.normalizeProvName(f.properties.name) === provincia.toLowerCase());
                 if (feature) {
                     highlightLayer = L.geoJSON(feature, {
@@ -172,6 +171,22 @@
                         interactive: false
                     }).addTo(map);
                     map.fitBounds(highlightLayer.getBounds());
+                }
+            } else if (region && window.geographicData && municipalitiesData) {
+                // Buscar los polígonos de todos los municipios de la región (púrpura #8B5CF6)
+                const regData = window.geographicData.regiones.find(rg => rg.nombre === region);
+                if (regData && regData.municipios) {
+                    const features = municipalitiesData.features.filter(f => {
+                        const mName = window.normalizeMuniName(f.properties.name);
+                        return regData.municipios.some(rm => rm.toLowerCase() === mName);
+                    });
+                    if (features.length > 0) {
+                        highlightLayer = L.geoJSON(features, {
+                            style: { color: '#8B5CF6', weight: 3, opacity: 0.9, fillOpacity: 0.1 },
+                            interactive: false
+                        }).addTo(map);
+                        map.fitBounds(highlightLayer.getBounds());
+                    }
                 }
             } else if (idPrefix === 'filter') {
                 map.setView([-17.783325, -63.182111], 12);

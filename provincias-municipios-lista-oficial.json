@@ -61,5 +61,35 @@
       "nombre": "Manuel María Caballero",
       "municipios": ["Comarapa", "Saipina"]
     }
+  ],
+  "regiones": [
+    {
+      "nombre": "Metropolitana",
+      "municipios": ["Santa Cruz de la Sierra", "Cotoca", "Porongo", "La Guardia", "El Torno", "Warnes"]
+    },
+    {
+      "nombre": "Valles",
+      "municipios": ["Samaipata", "Pampagrande", "Mairana", "Quirusillas", "Vallegrande", "El Trigal", "Moro Moro", "Postrervalle", "Pucara", "Comarapa", "Saipina"]
+    },
+    {
+      "nombre": "Chaco Cruceño",
+      "municipios": ["Lagunillas", "Cabezas", "Camiri", "Cuevo", "Boyuibe", "Charagua Iyambae", "Kereimba Iyaambae"]
+    },
+    {
+      "nombre": "Chiquitanía",
+      "municipios": ["San José de Chiquitos", "Pailón", "Roboré", "San Ignacio de Velasco", "San Miguel de Velasco", "San Rafael de Velasco", "Concepción", "San Javier", "San Ramón", "San Julián", "San Antonio de Lomerío", "Cuatro Cañadas"]
+    },
+    {
+      "nombre": "Pantanal",
+      "municipios": ["San Matías", "Puerto Suárez", "Puerto Quijarro", "El Carmen Rivero Tórrez"]
+    },
+    {
+      "nombre": "Norte Integrado",
+      "municipios": ["Montero", "General Saavedra", "Mineros", "Fernández Alonso", "San Pedro", "Portachuelo", "Santa Rosa del Sara", "Colpa Bélgica", "Buena Vista", "San Carlos", "Yapacaní", "San Juan de Yapacaní", "Okinawa Uno"]
+    },
+    {
+      "nombre": "Guarayos",
+      "municipios": ["Ascensión de Guarayos", "Urubichá", "El Puente"]
+    }
   ]
 }

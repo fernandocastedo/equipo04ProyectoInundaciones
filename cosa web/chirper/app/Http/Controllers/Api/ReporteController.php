@@ -184,6 +184,9 @@ class ReporteController extends Controller
                 'inundacion_id'     => $inundacion->id,
             ]);
 
+            // Recalcular centro geográfico promediado
+            $inundacion->recalcularCentroide();
+
             // Eager-load para cómputo dinámico del quórum
             $inundacion->load('reportesActivosTTL');
 

@@ -161,6 +161,35 @@ class Inundacion extends Model
         return (string) array_key_first($puntos);
     }
 
+    /**
+     * Recalcula el centroide (latitud, longitud) promediando ponderadamente
+     * las coordenadas de todos sus reportes vinculados y actualiza el modelo.
+     */
+    public function recalcularCentroide(): void
+    {
+        $reportes = $this->reportes()->where('estado_validacion', Reporte::VALIDACION_ACEPTADO)->get();
+        if ($reportes->isEmpty()) {
+            return;
+        }
+
+        $sumaLat = 0;
+        $sumaLng = 0;
+        $sumaPesos = 0;
+
+        foreach ($reportes as $rep) {
+            $peso = $rep->peso ?: 1; // Fallback por seguridad
+            $sumaLat += ((float) $rep->lat_reporte) * $peso;
+            $sumaLng += ((float) $rep->long_reporte) * $peso;
+            $sumaPesos += $peso;
+        }
+
+        if ($sumaPesos > 0) {
+            $this->latitud = $sumaLat / $sumaPesos;
+            $this->longitud = $sumaLng / $sumaPesos;
+            $this->save();
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Scopes de conveniencia
     // ─────────────────────────────────────────────────────────────────────

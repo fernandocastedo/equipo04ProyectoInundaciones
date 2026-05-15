@@ -85,8 +85,8 @@ final class ReportController
             foreach ($reportesPendientes as $rep) {
                 $cercanas = [];
                 foreach ($activas as $activa) {
-                    $lat1 = deg2rad((float) $rep->lat_gps);
-                    $lon1 = deg2rad((float) $rep->long_gps);
+                    $lat1 = deg2rad((float) $rep->lat_reporte);
+                    $lon1 = deg2rad((float) $rep->long_reporte);
                     $lat2 = deg2rad((float) $activa->latitud);
                     $lon2 = deg2rad((float) $activa->longitud);
                     $dLat = $lat2 - $lat1;
@@ -362,6 +362,13 @@ final class ReportController
                 ? (int) $data['inundacion_id']
                 : null,
         ]);
+
+        if ($nuevoEstado === Reporte::VALIDACION_ACEPTADO && !empty($data['inundacion_id'])) {
+            $inundacion = Inundacion::find((int) $data['inundacion_id']);
+            if ($inundacion) {
+                $inundacion->recalcularCentroide();
+            }
+        }
 
         return redirect()->route('reports.index')
             ->with('success', "Estado de validación del reporte #{$reporte->id} actualizado a \"{$nuevoEstado}\".");

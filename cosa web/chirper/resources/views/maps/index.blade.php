@@ -7,6 +7,15 @@
             <h1 class="text-xl font-semibold tracking-tight">Mapa de Reportes</h1>
             <p class="mt-1 text-sm text-gray-600">Visualiza los reportes de inundación en tiempo real.</p>
         </div>
+        
+        <div class="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+            <button id="btn-view-markers" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white shadow-sm text-gray-800 transition-all">
+                📍 Marcadores
+            </button>
+            <button id="btn-view-heatmap" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-gray-800 transition-all">
+                🔥 Mapa de Calor
+            </button>
+        </div>
     </div>
 
     <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -28,6 +37,8 @@
 <!-- LEAFLET CDN -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- LEAFLET HEATMAP PLUGIN -->
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
 <script>
     window.floodReports = @json($reports);
@@ -64,21 +75,75 @@
         }).addTo(map);
 
         let markersLayer = L.layerGroup().addTo(map);
+        let heatLayer = L.heatLayer([], {
+            radius: 25,
+            blur: 15,
+            maxZoom: 17,
+            gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1.0: 'red' }
+        });
+        
+        let currentMode = 'markers'; // 'markers' o 'heatmap'
+
+        // Controles UI
+        const btnMarkers = document.getElementById('btn-view-markers');
+        const btnHeatmap = document.getElementById('btn-view-heatmap');
+
+        btnMarkers.addEventListener('click', () => {
+            currentMode = 'markers';
+            btnMarkers.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+            btnMarkers.classList.remove('text-gray-500');
+            btnHeatmap.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+            btnHeatmap.classList.add('text-gray-500');
+            
+            map.removeLayer(heatLayer);
+            map.addLayer(markersLayer);
+        });
+
+        btnHeatmap.addEventListener('click', () => {
+            currentMode = 'heatmap';
+            btnHeatmap.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+            btnHeatmap.classList.remove('text-gray-500');
+            btnMarkers.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+            btnMarkers.classList.add('text-gray-500');
+            
+            map.removeLayer(markersLayer);
+            map.addLayer(heatLayer);
+        });
 
         function renderReports(reportsData) {
+            // Actualizar Marcadores
             markersLayer.clearLayers();
+            // Recolectar datos para heatmap
+            const heatData = [];
+
             reportsData.forEach(report => {
                 const lat = parseFloat(report.latitud);
                 const lng = parseFloat(report.longitud);
 
                 if (isNaN(lat) || isNaN(lng)) return;
 
-                let markerColor = "#4285F4"; // Default Blue
                 const severidad = report.intensidad_calculada || 'baja';
-                if (severidad === 'alta') markerColor = "#EA4335"; // Red
-                if (severidad === 'media') markerColor = "#FBBC05"; // Yellow
-                if (severidad === 'baja') markerColor = "#34A853"; // Green
+                
+                // Preparar datos Heatmap (1.0 = Max, 0.6 = Medio, 0.3 = Bajo)
+                let heatIntensity = 0.3;
+                let markerColor = "#34A853"; // Green (baja)
+                
+                if (severidad === 'alta') {
+                    markerColor = "#EA4335"; // Red
+                    heatIntensity = 1.0;
+                } else if (severidad === 'media') {
+                    markerColor = "#FBBC05"; // Yellow
+                    heatIntensity = 0.6;
+                }
 
+                // Ajustar calor según el quorum si existe (extra weight)
+                if (report.quorum_total && report.quorum_total > 5) {
+                    heatIntensity = Math.min(1.0, heatIntensity + (report.quorum_total * 0.02));
+                }
+
+                heatData.push([lat, lng, heatIntensity]);
+
+                // Dibujar el marcador
                 const customIcon = L.divIcon({
                     className: 'custom-leaflet-marker',
                     html: `<div style="background-color: ${markerColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
@@ -105,6 +170,9 @@
                  
                 markersLayer.addLayer(marker);
             });
+
+            // Actualizar datos del Heatmap
+            heatLayer.setLatLngs(heatData);
         }
 
         // 3. Pintar Reportes

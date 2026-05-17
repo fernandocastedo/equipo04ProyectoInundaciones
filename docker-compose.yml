@@ -36,7 +36,7 @@ services:
     depends_on:
       - postgres_db
     command: >
-      php -d opcache.enable_cli=1 -d opcache.validate_timestamps=0 artisan serve --host=0.0.0.0 --port=8001 --no-reload
+      php artisan serve --host=0.0.0.0 --port=8001
     networks:
       - app-network
 

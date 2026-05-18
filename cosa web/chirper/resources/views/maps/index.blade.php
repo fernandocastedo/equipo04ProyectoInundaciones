@@ -22,6 +22,42 @@
 
     <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative" style="height: 600px;">
         <div id="map" class="absolute inset-0 z-0"></div>
+        
+        <!-- LEYENDA DEL RADAR (UI/UX) -->
+        <div id="radar-legend" class="hidden absolute bottom-6 left-6 bg-white/95 backdrop-blur p-4 rounded-xl shadow-xl border border-gray-100 z-[1000] pointer-events-none transition-all duration-300">
+            <h4 id="radar-legend-title" class="text-xs font-bold text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>
+                <span>Intensidad de Lluvia</span>
+            </h4>
+            <div id="radar-legend-rain-colors" class="space-y-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-blue-400 opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Lluvia Débil / Llovizna</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-yellow-400 opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Lluvia Moderada</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-red-500 opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Tormenta Fuerte</span>
+                </div>
+            </div>
+            <div id="radar-legend-cloud-colors" class="hidden space-y-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-sky-200 opacity-60 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Nubes Dispersas</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-sky-600 opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Nubosidad Densa</span>
+                </div>
+            </div>
+            <p class="mt-3 text-[10px] text-gray-400 text-center italic">Datos de OpenWeatherMap</p>
+            <button type="button" onclick="window.mapObj.setView([-17.78, -63.18], 7)" class="mt-2 text-xs bg-blue-50 text-blue-600 px-2 py-1.5 rounded w-full border border-blue-100 hover:bg-blue-100 pointer-events-auto transition-colors font-medium">
+                🌍 Alejar para ver completo
+            </button>
+        </div>
     </div>
 </div>
 
@@ -92,21 +128,65 @@
         layerControl.addOverlay(markersLayer, "Reportes (Puntos)");
         layerControl.addOverlay(heatLayer, "Mapa de Calor");
 
-        // 4. Capa Radar de Lluvia en Vivo (RainViewer)
-        fetch("https://api.rainviewer.com/public/weather-maps.json")
-            .then(res => res.json())
-            .then(data => {
-                const pastFrames = data.radar.past;
-                if (pastFrames && pastFrames.length > 0) {
-                    const lastFrame = pastFrames[pastFrames.length - 1];
-                    const radarLayer = L.tileLayer(`https://tilecache.rainviewer.com${lastFrame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
-                        opacity: 0.6,
-                        attribution: 'RainViewer',
-                        zIndex: 10
-                    });
-                    layerControl.addOverlay(radarLayer, "Radar de Lluvia");
+        // 4. Capas Meteorológicas (OpenWeatherMap)
+        const precipLayer = L.layerGroup();
+        const cloudLayer = L.layerGroup();
+        layerControl.addOverlay(precipLayer, "Radar de Lluvia (OpenWeather)");
+        layerControl.addOverlay(cloudLayer, "Nubes (OpenWeather)");
+
+        // Limitamos los requests al bounding box de Santa Cruz y a un zoom máximo nativo de 8.
+        const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
+        
+        L.tileLayer('/weather/tiles/precipitation_new/{z}/{x}/{y}', {
+            opacity: 0.7,
+            attribution: '&copy; OpenWeatherMap',
+            bounds: santaCruzBounds,
+            minZoom: 5,
+            maxNativeZoom: 8,
+            maxZoom: 18,
+            updateWhenIdle: true
+        }).addTo(precipLayer);
+
+        L.tileLayer('/weather/tiles/clouds_new/{z}/{x}/{y}', {
+            opacity: 0.5,
+            attribution: '&copy; OpenWeatherMap',
+            bounds: santaCruzBounds,
+            minZoom: 5,
+            maxNativeZoom: 8,
+            maxZoom: 18,
+            updateWhenIdle: true
+        }).addTo(cloudLayer);
+
+        // Eventos para mostrar/ocultar la leyenda del radar de lluvia
+        map.on('overlayadd', function(e) {
+            if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
+                document.getElementById('radar-legend').classList.remove('hidden');
+                if (e.name === "Nubes (OpenWeather)") {
+                    document.getElementById('radar-legend-title').innerHTML = '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Densidad de Nubes</span>';
+                    document.getElementById('radar-legend-rain-colors').classList.add('hidden');
+                    document.getElementById('radar-legend-cloud-colors').classList.remove('hidden');
+                } else {
+                    document.getElementById('radar-legend-title').innerHTML = '<svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Intensidad de Lluvia</span>';
+                    document.getElementById('radar-legend-rain-colors').classList.remove('hidden');
+                    document.getElementById('radar-legend-cloud-colors').classList.add('hidden');
                 }
-            });
+            }
+        });
+        map.on('overlayremove', function(e) {
+            if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
+                if (!map.hasLayer(precipLayer) && !map.hasLayer(cloudLayer)) {
+                    document.getElementById('radar-legend').classList.add('hidden');
+                } else if (map.hasLayer(cloudLayer)) {
+                    document.getElementById('radar-legend-title').innerHTML = '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Densidad de Nubes</span>';
+                    document.getElementById('radar-legend-rain-colors').classList.add('hidden');
+                    document.getElementById('radar-legend-cloud-colors').classList.remove('hidden');
+                } else if (map.hasLayer(precipLayer)) {
+                    document.getElementById('radar-legend-title').innerHTML = '<svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Intensidad de Lluvia</span>';
+                    document.getElementById('radar-legend-rain-colors').classList.remove('hidden');
+                    document.getElementById('radar-legend-cloud-colors').classList.add('hidden');
+                }
+            }
+        });
 
         // 5. Red Hídrica (Canales de Drenaje)
         fetch('/red_hidrica_santa_cruz.json')

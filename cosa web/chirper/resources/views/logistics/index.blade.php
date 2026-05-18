@@ -326,13 +326,55 @@
         function initLogisticsMap() {
             const defaultLocation = [-17.783325, -63.182111]; // Santa Cruz, Bolivia
 
-            map = L.map('logistics_map').setView(defaultLocation, 12);
+            map = L.map('logistics_map', { preferCanvas: true }).setView(defaultLocation, 12);
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
+            });
 
-            markersLayer = L.layerGroup().addTo(map);
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            });
+
+            osmLayer.addTo(map);
+
+            const baseMaps = {
+                "Mapa Normal (OSM)": osmLayer,
+                "Satelital (Esri)": satelliteLayer
+            };
+
+            const overlayMaps = {};
+            const layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map); // Activo por defecto
+            layerControl.addOverlay(markersLayer, "Centros de Acopio");
+
+            // Capa Radar de Lluvia en Vivo (RainViewer)
+            fetch("https://api.rainviewer.com/public/weather-maps.json")
+                .then(res => res.json())
+                .then(data => {
+                    const pastFrames = data.radar.past;
+                    if (pastFrames && pastFrames.length > 0) {
+                        const lastFrame = pastFrames[pastFrames.length - 1];
+                        const radarLayer = L.tileLayer(`https://tilecache.rainviewer.com${lastFrame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+                            opacity: 0.6,
+                            attribution: 'RainViewer',
+                            zIndex: 10
+                        });
+                        layerControl.addOverlay(radarLayer, "Radar de Lluvia");
+                    }
+                });
+
+            // Red Hídrica (Canales de Drenaje)
+            fetch('/red_hidrica_santa_cruz.json')
+                .then(res => res.json())
+                .then(data => {
+                    const hydroLayer = L.geoJSON(data, {
+                        style: { color: '#0ea5e9', weight: 1.5, opacity: 0.8 },
+                        interactive: false
+                    });
+                    layerControl.addOverlay(hydroLayer, "Red Hídrica");
+                }).catch(e => console.warn("Error cargando red hídrica", e));
 
             renderMarkers(window.centros);
 
@@ -491,8 +533,26 @@
             let municipalitiesData = null;
             let highlightLayer = null; // Capa activa de resaltado (naranja=provincia, rojo=municipio)
 
-            fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
-            fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+            let provincesOverlay = L.geoJSON(null, {
+                style: { color: '#F97316', weight: 1.5, opacity: 0.8, fillOpacity: 0.05 },
+                interactive: false
+            });
+            let municipalitiesOverlay = L.geoJSON(null, {
+                style: { color: '#EF4444', weight: 1.5, opacity: 0.8, fillOpacity: 0.05 },
+                interactive: false
+            });
+
+            layerControl.addOverlay(provincesOverlay, "Fronteras Provinciales");
+            layerControl.addOverlay(municipalitiesOverlay, "Fronteras Municipales");
+
+            fetch('/provinces.geojson').then(res => res.json()).then(data => {
+                provincesData = data;
+                provincesOverlay.addData(data);
+            });
+            fetch('/municipalities.geojson').then(res => res.json()).then(data => {
+                municipalitiesData = data;
+                municipalitiesOverlay.addData(data);
+            });
 
             @if($isAdmin)
                 let santaCruzPolygon = null;

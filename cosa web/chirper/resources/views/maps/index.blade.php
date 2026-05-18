@@ -7,15 +7,6 @@
             <h1 class="text-xl font-semibold tracking-tight">Mapa de Reportes</h1>
             <p class="mt-1 text-sm text-gray-600">Visualiza los reportes de inundación en tiempo real.</p>
         </div>
-        
-        <div class="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
-            <button id="btn-view-markers" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white shadow-sm text-gray-800 transition-all">
-                📍 Marcadores
-            </button>
-            <button id="btn-view-heatmap" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-gray-800 transition-all">
-                🔥 Mapa de Calor
-            </button>
-        </div>
     </div>
 
     <div class="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -66,15 +57,31 @@
             }
         }
 
-        // 1. Inicializar Mapa de Leaflet
-        const map = L.map('map').setView(centerLoc, 12); window.mapObj = map;
+        // 1. Inicializar Mapa de Leaflet (con Canvas para mejor rendimiento con muchas geometrías)
+        const map = L.map('map', { preferCanvas: true }).setView(centerLoc, 12); window.mapObj = map;
 
-        // 2. Cargar Capa de OpenStreetMap (Gratuita)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // 2. Cargar Capas Base (Normal y Satelital)
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        });
 
-        let markersLayer = L.layerGroup().addTo(map);
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        // Añadir capa por defecto
+        osmLayer.addTo(map);
+
+        // Control de Capas
+        const baseMaps = {
+            "Mapa Normal (OSM)": osmLayer,
+            "Satelital (Esri)": satelliteLayer
+        };
+
+        const overlayMaps = {};
+        const layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+        let markersLayer = L.layerGroup().addTo(map); // Por defecto activo
         let heatLayer = L.heatLayer([], {
             radius: 25,
             blur: 15,
@@ -82,33 +89,35 @@
             gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1.0: 'red' }
         });
         
-        let currentMode = 'markers'; // 'markers' o 'heatmap'
+        layerControl.addOverlay(markersLayer, "Reportes (Puntos)");
+        layerControl.addOverlay(heatLayer, "Mapa de Calor");
 
-        // Controles UI
-        const btnMarkers = document.getElementById('btn-view-markers');
-        const btnHeatmap = document.getElementById('btn-view-heatmap');
+        // 4. Capa Radar de Lluvia en Vivo (RainViewer)
+        fetch("https://api.rainviewer.com/public/weather-maps.json")
+            .then(res => res.json())
+            .then(data => {
+                const pastFrames = data.radar.past;
+                if (pastFrames && pastFrames.length > 0) {
+                    const lastFrame = pastFrames[pastFrames.length - 1];
+                    const radarLayer = L.tileLayer(`https://tilecache.rainviewer.com${lastFrame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+                        opacity: 0.6,
+                        attribution: 'RainViewer',
+                        zIndex: 10
+                    });
+                    layerControl.addOverlay(radarLayer, "Radar de Lluvia");
+                }
+            });
 
-        btnMarkers.addEventListener('click', () => {
-            currentMode = 'markers';
-            btnMarkers.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
-            btnMarkers.classList.remove('text-gray-500');
-            btnHeatmap.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
-            btnHeatmap.classList.add('text-gray-500');
-            
-            map.removeLayer(heatLayer);
-            map.addLayer(markersLayer);
-        });
-
-        btnHeatmap.addEventListener('click', () => {
-            currentMode = 'heatmap';
-            btnHeatmap.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
-            btnHeatmap.classList.remove('text-gray-500');
-            btnMarkers.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
-            btnMarkers.classList.add('text-gray-500');
-            
-            map.removeLayer(markersLayer);
-            map.addLayer(heatLayer);
-        });
+        // 5. Red Hídrica (Canales de Drenaje)
+        fetch('/red_hidrica_santa_cruz.json')
+            .then(res => res.json())
+            .then(data => {
+                const hydroLayer = L.geoJSON(data, {
+                    style: { color: '#0ea5e9', weight: 1.5, opacity: 0.8 },
+                    interactive: false
+                });
+                layerControl.addOverlay(hydroLayer, "Red Hídrica");
+            }).catch(e => console.warn("Error cargando red hídrica", e));
 
         function renderReports(reportsData) {
             // Actualizar Marcadores
@@ -189,8 +198,26 @@
         let municipalitiesData = null;
         let highlightLayer = null; // Capa activa de resaltado (naranja=provincia, rojo=municipio)
 
-        fetch('/provinces.geojson').then(res => res.json()).then(data => provincesData = data);
-        fetch('/municipalities.geojson').then(res => res.json()).then(data => municipalitiesData = data);
+        let provincesOverlay = L.geoJSON(null, {
+            style: { color: '#F97316', weight: 1.5, opacity: 0.8, fillOpacity: 0.05 },
+            interactive: false
+        });
+        let municipalitiesOverlay = L.geoJSON(null, {
+            style: { color: '#EF4444', weight: 1.5, opacity: 0.8, fillOpacity: 0.05 },
+            interactive: false
+        });
+
+        layerControl.addOverlay(provincesOverlay, "Fronteras Provinciales");
+        layerControl.addOverlay(municipalitiesOverlay, "Fronteras Municipales");
+
+        fetch('/provinces.geojson').then(res => res.json()).then(data => {
+            provincesData = data;
+            provincesOverlay.addData(data);
+        });
+        fetch('/municipalities.geojson').then(res => res.json()).then(data => {
+            municipalitiesData = data;
+            municipalitiesOverlay.addData(data);
+        });
 
         // -------------------------------------------------------------
         // EVENTO CENTRAL DE FILTRADO: locationFilterChanged

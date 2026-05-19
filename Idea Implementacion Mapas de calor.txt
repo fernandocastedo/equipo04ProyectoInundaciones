@@ -1,0 +1,43 @@
+PASO 1: Recepción y Agrupación (Backend + SQL Server)
+Llega un nuevo reporte desde el frontend.
+
+Laravel consulta a SQL Server: "¿Hay alguna Inundación activa a menos de 100 metros de esta coordenada?" (Usando STDistance en SQL Server).
+
+Si NO hay: Crea un nuevo registro en la tabla Inundaciones (asignándole su Municipio y Provincia correspondientes). Se establece un polígono inicial circular pequeño (ej. 20 metros).
+
+Si SÍ hay: Vincula el reporte a esa Inundación.
+
+PASO 2: La Lógica del Agua (Consumo de API de Elevación)Aquí es donde la inundación "crece" de forma inteligente.Cuando una Inundación recibe un número X de reportes nuevos, Laravel dispara un Job (proceso en segundo plano).El algoritmo toma el centroide de la inundación y calcula 8 puntos alrededor (Norte, Sur, Este, Oeste y diagonales) a una distancia de, por ejemplo, 50 metros.Laravel envía esas 9 coordenadas (el centro + las 8 alrededor) a la API de Open Topo Data.La Regla de Oro: El agua no sube pendientes. El algoritmo compara la altura de los 8 puntos con el centro. La zona de la inundación solo se expandirá hacia los puntos que tengan una altitud MENOR o IGUAL al centro.Con los puntos válidos (más bajos), Laravel calcula un nuevo polígono y actualiza el campo de geografía (GEOGRAPHY) de esa inundación en SQL Server.
+
+PASO 3: Visualización en el Frontend (El "Mapa de Calor" Inteligente)
+El ciudadano entra a la web.
+
+El frontend (usando Leaflet.js que es gratis y excelente) consume tu API de Laravel.
+
+Laravel envía las coordenadas del polígono calculado.
+
+Leaflet dibuja ese polígono en el mapa con un color rojo/naranja semitransparente. Ya no es un punto ciego, es una mancha que se escurrió hacia las zonas más bajas, representando fielmente hacia dónde está yendo el agua en Santa Cruz.
+
+PASO 4: La Intervención de la Autoridad (Edición Front/Back)
+Las matemáticas no siempre contemplan que una alcantarilla esté tapada o un canal de drenaje se haya roto. Aquí entra la autoridad.
+
+Frontend (El Canvas de la Autoridad): El usuario con rol "Autoridad" inicia sesión. En su mapa, ve los polígonos generados por el algoritmo.
+
+Utiliza una herramienta del frontend (te recomiendo el plugin Leaflet.draw). Esto le permite hacer clic sobre la mancha roja generada por el sistema y le aparecerán "nodos" (puntos) en los bordes.
+
+La autoridad arrastra esos nodos con el mouse, estirando la inundación hacia una avenida entera porque recibió un reporte por radio de que el agua llegó hasta allá.
+
+Guardado: La autoridad hace clic en "Confirmar". El frontend extrae las nuevas coordenadas de esa forma dibujada y hace un POST a Laravel.
+
+Backend (Sobreescritura): Laravel recibe el nuevo polígono. En la tabla Inundaciones, actualizas el polígono y marcas un campo booleano: editado_por_autoridad = TRUE.
+
+Freno al Algoritmo: A partir de ese momento, el Paso 2 (la API de elevación) se desactiva para esa inundación específica. La palabra de la autoridad manda. El sistema respetará la forma dibujada manualmente hasta que la inundación caduque (tu regla de 1 semana, por ejemplo).
+
+¿Por qué esta lógica es perfecta para el proyecto?
+Resuelve el problema que plantee magistralmente:
+
+Si 100 personas reportan desde el mismo punto alto, el sistema detectará hacia dónde debe escurrir el agua (por elevación) y dibujará la mancha hacia allá.
+
+Deja el control final en manos humanas (la autoridad), lo cual es el requisito número uno en sistemas de gestión de crisis y desastres.
+
+Al usar polígonos en lugar de la opacidad de un mapa de calor normal, evitas sobrecargar el navegador renderizando cientos de puntos individuales.

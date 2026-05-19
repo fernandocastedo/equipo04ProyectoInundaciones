@@ -34,6 +34,10 @@ Route::get('/reporte-rapido', function () {
 
 Route::get('/weather/tiles/{layer}/{z}/{x}/{y}', [\App\Http\Controllers\WeatherController::class, 'getTile'])->name('weather.tiles');
 
+// Proxy para Open Topo Data — datos de elevación del terreno
+// Usado por el Job CalcularPoligonoInundacion y opcionalmente por el frontend
+Route::get('/api/elevation', [\App\Http\Controllers\ElevationController::class, 'getElevation'])->name('elevation.get');
+
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/maps', [MapController::class, 'index'])->name('maps.index');

@@ -85,6 +85,12 @@ class InundacionResource extends JsonResource
             'esta_confirmada'      => $estaConfirmada,
             'desglose_puntos'      => $desglosePuntos,
 
+            // ── Polígono de área de inundación (calculado por CalcularPoligonoInundacion Job) ──
+            // Array de [lat, lng] pares. Null si aún no fue calculado.
+            'polygon_coords'            => $this->polygon_coords,
+            'polygon_calculado_at'      => $this->polygon_calculado_at?->toISOString(),
+            'polygon_editado_autoridad' => (bool) $this->polygon_editado_autoridad,
+
             // ── Detalle de reportes para el panel lateral del mapa ───────
             'reportes_activos' => $reportesActivosTTL,
         ];

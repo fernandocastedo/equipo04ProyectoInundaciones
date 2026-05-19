@@ -71,12 +71,21 @@
     window.floodReports = @json($reports);
     window.pendingReports = [];
     
-    fetch('/api/reportes/pendientes')
-        .then(res => res.json())
+    fetch('/api/reportes/pendientes', {
+        headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {{ session("api_token") }}'
+        }
+    })
+        .then(res => {
+            if (!res.ok) throw new Error('Network response was not ok');
+            return res.json();
+        })
         .then(data => {
             window.pendingReports = data;
-            renderPendingReports(data);
-        });
+            if (window.renderPendingReports) window.renderPendingReports(data);
+        })
+        .catch(err => console.error("Error fetching pending reports:", err));
     
     function initMap() { 
         const defaultLocation = [-17.783325, -63.182111]; // Centro de Santa Cruz de la Sierra, Bolivia 
@@ -137,24 +146,26 @@
         // Limitamos los requests al bounding box de Santa Cruz y a un zoom máximo nativo de 8.
         const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
         
-        L.tileLayer('/weather/tiles/precipitation_new/{z}/{x}/{y}', {
-            opacity: 0.7,
+        L.tileLayer('/weather/tiles/precipitation_new/{z}/{x}/{y}?v=2', {
+            opacity: 0.85,
             attribution: '&copy; OpenWeatherMap',
             bounds: santaCruzBounds,
             minZoom: 5,
             maxNativeZoom: 8,
             maxZoom: 18,
-            updateWhenIdle: true
+            updateWhenIdle: true,
+            zIndex: 10
         }).addTo(precipLayer);
 
-        L.tileLayer('/weather/tiles/clouds_new/{z}/{x}/{y}', {
-            opacity: 0.5,
+        L.tileLayer('/weather/tiles/clouds_new/{z}/{x}/{y}?v=2', {
+            opacity: 0.85,
             attribution: '&copy; OpenWeatherMap',
             bounds: santaCruzBounds,
             minZoom: 5,
             maxNativeZoom: 8,
             maxZoom: 18,
-            updateWhenIdle: true
+            updateWhenIdle: true,
+            zIndex: 10
         }).addTo(cloudLayer);
 
         // Eventos para mostrar/ocultar la leyenda del radar de lluvia
@@ -268,10 +279,10 @@
         renderReports(window.floodReports);
 
         // -------------------------------------------------------------
-        // Cargar geometr�as GeoJSON para resaltado de fronteras.
-        // NOTA: A diferencia de logistics/index, aqu� NO hay clic para registrar;
+        // Cargar geometras GeoJSON para resaltado de fronteras.
+        // NOTA: A diferencia de logistics/index, aqu NO hay clic para registrar;
         // estos datos solo se usan para el resaltado visual del filtro.
-        // Las funciones de traducci�n (normalizeProvName, normalizeMuniName) est�n
+        // Las funciones de traduccin (normalizeProvName, normalizeMuniName) estn
         // definidas globalmente en layouts/app.blade.php y disponibles en toda la app.
         // -------------------------------------------------------------
         let provincesData = null;
@@ -377,4 +388,48 @@
     }
 </script>
 @endsection
-<script>window.renderPendingReports = function(pendingData) { pendingData.forEach(report => { const lat = parseFloat(report.lat_reporte); const lng = parseFloat(report.long_reporte); if (isNaN(lat) || isNaN(lng)) return; const customIcon = L.divIcon({ className: 'custom-leaflet-marker', html: '<div style="background-color: #F59E0B; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5); animation: pulse 2s infinite;"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }); const contentStr = '<div class="max-w-xs"><p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente</p><p class="text-xs text-gray-600 mb-2"><b>Intensidad Propuesta:</b> ' + report.intensidad_propuesta + '</p><div class="flex flex-col space-y-2 mt-2"><button onclick="validateReport(' + report.id + ', ''vincular'');" class="bg-blue-500 text-white px-2 py-1 text-xs rounded">Vincular a Cercana</button><button onclick="validateReport(' + report.id + ', ''crear'');" class="bg-green-500 text-white px-2 py-1 text-xs rounded">Crear Nueva</button><button onclick="validateReport(' + report.id + ', ''rechazar'');" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Rechazar</button></div></div>'; const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(contentStr, { minWidth: 200 }); window.mapObj.addLayer(marker); }); }; window.validateReport = function(id, action) { let body = { action: action }; if (action === 'vincular') { const inundación_id = prompt('Ingrese el ID de la inundación a la que desea vincular:'); if (!inundación_id) return; body.inundación_id = inundación_id; } fetch('/api/reportes/' + id + '/validar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer {{ session('api_token') }}' }, body: JSON.stringify(body) }).then(res => res.json()).then(data => { alert(data.message); location.reload(); }); };</script>
+<script>
+window.renderPendingReports = function(pendingData) {
+    pendingData.forEach(report => {
+        const lat = parseFloat(report.lat_reporte);
+        const lng = parseFloat(report.long_reporte);
+        if (isNaN(lat) || isNaN(lng)) return;
+        
+        const customIcon = L.divIcon({
+            className: 'custom-leaflet-marker',
+            html: '<div style="background-color: #F59E0B; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5); animation: pulse 2s infinite;"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+        
+        const contentStr = '<div class="max-w-xs"><p class="font-semibold text-sm mb-1 text-orange-600">Reporte Pendiente</p><p class="text-xs text-gray-600 mb-2"><b>Intensidad Propuesta:</b> ' + report.intensidad_propuesta + '</p><div class="flex flex-col space-y-2 mt-2"><button onclick="validateReport(' + report.id + ', \'vincular\');" class="bg-blue-500 text-white px-2 py-1 text-xs rounded">Vincular a Cercana</button><button onclick="validateReport(' + report.id + ', \'crear\');" class="bg-green-500 text-white px-2 py-1 text-xs rounded">Crear Nueva</button><button onclick="validateReport(' + report.id + ', \'rechazar\');" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Rechazar</button></div></div>';
+        
+        const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(contentStr, { minWidth: 200 });
+        if (window.mapObj) window.mapObj.addLayer(marker);
+    });
+};
+
+window.validateReport = function(id, action) {
+    let body = { action: action };
+    if (action === 'vincular') {
+        const inundación_id = prompt('Ingrese el ID de la inundación a la que desea vincular:');
+        if (!inundación_id) return;
+        body.inundación_id = inundación_id;
+    }
+    
+    fetch('/api/reportes/' + id + '/validar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {{ session("api_token") }}'
+        },
+        body: JSON.stringify(body)
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    });
+};
+</script>

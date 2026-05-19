@@ -394,24 +394,26 @@
             // Limitamos los requests al bounding box de Santa Cruz y a un zoom máximo nativo de 8.
             const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
             
-            L.tileLayer('/weather/tiles/precipitation_new/{z}/{x}/{y}', {
-                opacity: 0.7,
+            L.tileLayer('/weather/tiles/precipitation_new/{z}/{x}/{y}?v=2', {
+                opacity: 0.85,
                 attribution: '&copy; OpenWeatherMap',
                 bounds: santaCruzBounds,
                 minZoom: 5,
                 maxNativeZoom: 8,
                 maxZoom: 18,
-                updateWhenIdle: true
+                updateWhenIdle: true,
+                zIndex: 10
             }).addTo(precipLayer);
 
-            L.tileLayer('/weather/tiles/clouds_new/{z}/{x}/{y}', {
-                opacity: 0.5,
+            L.tileLayer('/weather/tiles/clouds_new/{z}/{x}/{y}?v=2', {
+                opacity: 0.85,
                 attribution: '&copy; OpenWeatherMap',
                 bounds: santaCruzBounds,
                 minZoom: 5,
                 maxNativeZoom: 8,
                 maxZoom: 18,
-                updateWhenIdle: true
+                updateWhenIdle: true,
+                zIndex: 10
             }).addTo(cloudLayer);
 
             // Eventos para mostrar/ocultar la leyenda del radar de lluvia

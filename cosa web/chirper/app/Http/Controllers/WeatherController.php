@@ -31,7 +31,14 @@ class WeatherController extends Controller
 
         if (Cache::has($cacheKey)) {
             $tileData = Cache::get($cacheKey);
-            if ($tileData && $tileData !== 'EMPTY') {
+            if ($tileData === 'EMPTY') {
+                $transparentPixel = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+                return response($transparentPixel, 200, [
+                    'Content-Type' => 'image/png',
+                    'Cache-Control' => 'public, max-age=300'
+                ]);
+            }
+            if ($tileData) {
                 return Response::make(base64_decode($tileData), 200, [
                     'Content-Type' => 'image/png',
                     'Cache-Control' => 'public, max-age=1800'
@@ -46,7 +53,7 @@ class WeatherController extends Controller
             $url = "https://tile.openweathermap.org/map/{$layer}/{$z}/{$x}/{$y}.png?appid={$apiKey}";
             
             try {
-                $response = Http::timeout(3)->get($url);
+                $response = Http::timeout(5)->get($url);
                 
                 if ($response->successful() && str_contains($response->header('Content-Type'), 'image/png')) {
                     $tileData = base64_encode($response->body());
@@ -59,7 +66,11 @@ class WeatherController extends Controller
 
         if (!$tileData) {
             $transparentPixel = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
-            return response($transparentPixel, 200, ['Content-Type' => 'image/png']);
+            Cache::put($cacheKey, 'EMPTY', now()->addMinutes(5));
+            return response($transparentPixel, 200, [
+                'Content-Type' => 'image/png',
+                'Cache-Control' => 'public, max-age=300'
+            ]);
         }
 
         return Response::make(base64_decode($tileData), 200, [

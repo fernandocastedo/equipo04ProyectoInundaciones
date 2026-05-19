@@ -12,6 +12,11 @@
     @if (session()->has('api_token'))
         <meta name="reports-notifications-endpoint" content="{{ route('reports.notifications.feed', [], false) }}">
         <meta name="api-user-carnet" content="{{ (string) ($apiUser['carnet'] ?? '') }}">
+        <meta name="reverb-app-key" content="{{ config('broadcasting.connections.reverb.key') }}">
+        <meta name="reverb-host" content="{{ config('broadcasting.connections.reverb.options.host', '127.0.0.1') }}">
+        <meta name="reverb-port" content="{{ config('broadcasting.connections.reverb.options.port', 8080) }}">
+        <meta name="reverb-scheme" content="{{ config('broadcasting.connections.reverb.options.scheme', 'http') }}">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
     @endif
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -266,6 +271,8 @@
         }
     });
     </script>
+
+    @include('chat.widget')
 </body>
 
 <script>

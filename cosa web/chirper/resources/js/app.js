@@ -1,4 +1,33 @@
 import './bootstrap';
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+
+// Inicializar Laravel Echo con Reverb (solo si el usuario tiene sesión activa)
+(function () {
+    function getMeta(name, fallback = '') {
+        return document.querySelector(`meta[name="${name}"]`)?.content ?? fallback;
+    }
+
+    const reverbKey = getMeta('reverb-app-key');
+    if (!reverbKey) return; // No hay sesión, no inicializar
+
+    window.Pusher = Pusher;
+    window.Echo = new Echo({
+        broadcaster: 'reverb',
+        key: reverbKey,
+        wsHost: getMeta('reverb-host', '127.0.0.1'),
+        wsPort: parseInt(getMeta('reverb-port', '8080'), 10),
+        wssPort: parseInt(getMeta('reverb-port', '8080'), 10),
+        forceTLS: getMeta('reverb-scheme', 'http') === 'https',
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint: '/chat/auth',
+        auth: {
+            headers: {
+                'X-CSRF-TOKEN': getMeta('csrf-token'),
+            },
+        },
+    });
+})();
 
 const POLL_INTERVAL_MS = 15000;
 

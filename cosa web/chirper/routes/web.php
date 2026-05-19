@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\LogisticsController;
@@ -71,5 +72,16 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::get('/victimas/{id}/edit', [VictimaController::class, 'edit'])->name('victimas.edit')->where('id', '[0-9]+');
         Route::put('/victimas/{id}', [VictimaController::class, 'update'])->name('victimas.update')->where('id', '[0-9]+');
         Route::delete('/victimas/{id}', [VictimaController::class, 'destroy'])->name('victimas.destroy')->where('id', '[0-9]+');
+
+        // ── Chat entre autoridades ────────────────────────────────────────────
+        Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+        Route::get('/chat/authorities', [ChatController::class, 'authorities'])->name('chat.authorities');
+        Route::get('/chat/history/{carnet}', [ChatController::class, 'history'])->name('chat.history');
+        Route::post('/chat/message', [ChatController::class, 'store'])->name('chat.store');
     });
 });
+
+// Endpoint de autenticación de canales privados Reverb (sesión personalizada)
+Route::post('/chat/auth', [ChatController::class, 'broadcastAuth'])
+    ->middleware([ApiAuthenticate::class, EnsureApiAuthority::class])
+    ->name('chat.broadcast.auth');

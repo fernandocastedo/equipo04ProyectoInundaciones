@@ -31,6 +31,51 @@ class DatabaseSeeder extends Seeder
             'is_banned' => false,
         ]);
 
+        // Autoridades extra para probar chat 1-a-1
+        User::query()->updateOrCreate(['carnet' => '10000002'], [
+            'carnet' => '10000002',
+            'name' => 'Jefe Emergencias',
+            'phone' => '70000002',
+            'address' => 'Central de Emergencias',
+            'email' => 'emergencias@autoridad.gob',
+            'role' => User::ROLE_AUTHORITY,
+            'password' => 'password123',
+            'is_banned' => false,
+        ]);
+
+        User::query()->updateOrCreate(['carnet' => '10000003'], [
+            'carnet' => '10000003',
+            'name' => 'Coord. Logística',
+            'phone' => '70000003',
+            'address' => 'Depósito Municipal',
+            'email' => 'logistica@autoridad.gob',
+            'role' => User::ROLE_AUTHORITY,
+            'password' => 'password123',
+            'is_banned' => false,
+        ]);
+
+        User::query()->updateOrCreate(['carnet' => '10000004'], [
+            'carnet' => '10000004',
+            'name' => 'Resp. Comunicaciones',
+            'phone' => '70000004',
+            'address' => 'Torre de Comunicaciones',
+            'email' => 'comunicaciones@autoridad.gob',
+            'role' => User::ROLE_AUTHORITY,
+            'password' => 'password123',
+            'is_banned' => false,
+        ]);
+
+        User::query()->updateOrCreate(['carnet' => '10000005'], [
+            'carnet' => '10000005',
+            'name' => 'Dir. Coordinación',
+            'phone' => '70000005',
+            'address' => 'Sala de Situación',
+            'email' => 'coordinacion@autoridad.gob',
+            'role' => User::ROLE_AUTHORITY,
+            'password' => 'password123',
+            'is_banned' => false,
+        ]);
+
         User::query()->updateOrCreate(['carnet' => '20000001'], [
             'carnet' => '20000001',
             'name' => 'Autoridad Norte',

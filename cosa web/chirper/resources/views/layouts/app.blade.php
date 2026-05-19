@@ -21,6 +21,17 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 
+    <style>
+        /* Ocultar barra de desplazamiento en todos los navegadores para elementos con .no-scrollbar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none !important;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none !important;  /* IE y Edge */
+            scrollbar-width: none !important;  /* Firefox */
+        }
+    </style>
+
     <script>
         // Normaliza nombre de PROVINCIA desde el GeoJSON al nombre oficial
         window.normalizeProvName = function(name) {
@@ -57,86 +68,118 @@
     </script>
 </head>
 
-<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
-    <header class="border-b border-gray-200 bg-white">
-        <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-4">
-            <a href="{{ route('reports.index', [], false) }}"
-                class="font-semibold tracking-tight hover:underline underline-offset-4">
-                {{ config('app.name', 'Flood Reports') }}
-            </a>
-
-            <nav class="flex items-center gap-1 text-sm">
-                @if (session()->has('api_token'))
-                    <a href="{{ route('reports.index', [], false) }}"
-                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                        Reportes
-                    </a>
-                    <a href="{{ route('maps.index', [], false) }}"
-                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                        Mapas
-                    </a>
-                    <a href="{{ route('logistica.index', [], false) }}"
-                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                        Logística
-                    </a>
-                    <a href="{{ route('victimas.index', [], false) }}"
-                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                        Víctimas
-                    </a>
-                    <a href="{{ route('reports.create', [], false) }}"
-                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                        Crear
-                    </a>
-                    <span class="hidden sm:inline-flex items-center gap-1 rounded-md px-3 py-2 text-gray-600">
-                        <span class="truncate max-w-[14rem]">{{ (string) ($apiUser['name'] ?? '') }}</span>
-                        @if ($apiRole !== '')
-                            <span class="text-gray-400">·</span>
-                            <span class="text-gray-500">{{ $apiRole }}</span>
-                        @endif
-                    </span>
-                    {{-- Botón de geolocalización: pide la ubicación 1 sola vez y la guarda en localStorage --}}
-                    {{-- Queda disponible para todos los módulos (Logística, Mapas, Reportes) via window.getUserLocation() --}}
-                    <button id="btn-geolocate"
-                        class="rounded-md px-2 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-1 text-sm"
-                        title="Guardar mi ubicación para encontrar centros cercanos">
-                        <span id="geo-btn-icon">📍</span>
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased flex">
+    @if (session()->has('api_token'))
+        <!-- SIDEBAR INTERACTIVO -->
+        <aside class="fixed inset-y-0 left-0 bg-[#0f172a] text-gray-300 w-16 hover:w-64 transition-all duration-300 ease-in-out z-[999] overflow-x-hidden overflow-y-hidden flex flex-col group border-r border-gray-800 shadow-2xl no-scrollbar">
+            <!-- Logo / Brand -->
+            <div class="h-16 flex items-center px-4 border-b border-gray-800 shrink-0 bg-[#0b1120]">
+                <div class="min-w-[32px] h-8 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/30">
+                    ISCZ
+                </div>
+                <span class="ml-4 font-bold text-lg text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap tracking-tight">
+                    Inundaciones SCZ
+                </span>
+            </div>
+            
+            <!-- Navigation Links -->
+            <nav class="flex-1 py-6 flex flex-col gap-1 overflow-y-auto no-scrollbar">
+                <a href="{{ route('reports.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('reports.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Reportes">
+                    <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Reportes</span>
+                </a>
+                
+                <a href="{{ route('maps.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('maps.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Mapas">
+                    <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                    <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Mapas</span>
+                </a>
+                
+                <a href="{{ route('logistica.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('logistica.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Logística">
+                    <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Logística</span>
+                </a>
+                
+                <a href="{{ route('victimas.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('victimas.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Víctimas">
+                    <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Víctimas</span>
+                </a>
+            </nav>
+            
+            <!-- Bottom Actions -->
+            <div class="p-3 border-t border-gray-800">
+                <form method="POST" action="{{ route('logout', [], false) }}" class="w-full">
+                    @csrf
+                    <button type="submit" class="flex items-center w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-gray-800 rounded-lg transition-colors" title="Salir">
+                        <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Cerrar Sesión</span>
                     </button>
-                    <div class="relative">
-                        <button id="notifications-toggle"
-                            class="rounded-md px-2 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-1 text-sm"
-                            title="Notificaciones">
-                            <span>🔔</span>
-                            <span id="notifications-badge"
-                                class="hidden min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">0</span>
-                        </button>
-                        <div id="notifications-panel"
-                            class="hidden absolute right-0 z-50 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
-                            <div class="border-b border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600">
-                                Notificaciones
+                </form>
+            </div>
+        </aside>
+    @endif
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-h-screen {{ session()->has('api_token') ? 'ml-16' : '' }} transition-all duration-300 w-full relative">
+        
+        <!-- HEADER TOP BAR -->
+        <header class="border-b border-gray-200 bg-white/80 backdrop-blur-md sticky top-0 z-[90] shadow-sm">
+            <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
+                
+                <div class="flex items-center gap-4">
+                    @if (!session()->has('api_token'))
+                    <a href="{{ route('reports.index', [], false) }}" class="font-bold text-xl tracking-tight text-blue-600 hover:text-blue-700 transition-colors">
+                        {{ config('app.name', 'Flood Reports') }}
+                    </a>
+                    @else
+                    <span class="text-sm font-semibold text-gray-500 uppercase tracking-widest hidden sm:block">Panel de Control</span>
+                    @endif
+                </div>
+
+                <nav class="flex items-center gap-2 sm:gap-4 text-sm">
+                    @if (session()->has('api_token'))
+                        
+                        <!-- User Info -->
+                        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200">
+                            <div class="w-6 h-6 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs">
+                                {{ strtoupper(substr($apiUser['name'] ?? 'U', 0, 1)) }}
                             </div>
-                            <div id="notifications-list" class="max-h-80 overflow-y-auto">
-                                <div class="px-3 py-4 text-xs text-gray-500">Sin notificaciones por ahora.</div>
+                            <span class="font-medium text-gray-700 max-w-[10rem] truncate">{{ (string) ($apiUser['name'] ?? '') }}</span>
+                            @if ($apiRole !== '')
+                                <span class="bg-white text-gray-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-gray-200">{{ $apiRole }}</span>
+                            @endif
+                        </div>
+
+                        <!-- Botón Geolocalización -->
+                        <button id="btn-geolocate" class="rounded-full w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-transparent hover:border-blue-200" title="Guardar mi ubicación">
+                            <span id="geo-btn-icon" class="text-lg">📍</span>
+                        </button>
+
+                        <!-- Notificaciones -->
+                        <div class="relative">
+                            <button id="notifications-toggle" class="rounded-full w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-transparent hover:border-blue-200 relative" title="Notificaciones">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                                <span id="notifications-badge" class="hidden absolute top-0 right-0 min-w-[18px] h-[18px] rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center shadow-sm border-2 border-white">0</span>
+                            </button>
+                            <div id="notifications-panel" class="hidden absolute right-0 z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
+                                <div class="bg-gray-50 border-b border-gray-200 px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    Notificaciones
+                                </div>
+                                <div id="notifications-list" class="max-h-80 overflow-y-auto">
+                                    <div class="px-4 py-6 text-sm text-center text-gray-500">Sin notificaciones por ahora.</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <form method="POST" action="{{ route('logout', [], false) }}">
-                        @csrf
-                        <button type="submit"
-                            class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
-                            Salir
-                        </button>
-                    </form>
-                @else
-                    <a href="{{ route('login', [], false) }}"
-                        class="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900">Login</a>
-                    <a href="{{ route('register', [], false) }}"
-                        class="rounded-md bg-gray-900 px-3 py-2 font-medium text-white hover:bg-gray-800">Registro</a>
-                @endif
-            </nav>
-        </div>
-    </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-8">
+                    @else
+                        <a href="{{ route('login', [], false) }}" class="rounded-full px-4 py-2 text-gray-600 hover:bg-gray-100 font-medium transition-colors">Iniciar Sesión</a>
+                        <a href="{{ route('register', [], false) }}" class="rounded-full bg-gray-900 px-5 py-2 font-medium text-white shadow hover:bg-gray-800 transition-colors">Registrarse</a>
+                    @endif
+                </nav>
+            </div>
+        </header>
+
+        <!-- PAGE CONTENT -->
+        <main class="mx-auto w-full max-w-7xl px-4 py-8 flex-1">
         @if (session('status'))
             <div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm">
                 {{ session('status') }}
@@ -155,7 +198,8 @@
         @endif
 
         @yield('content')
-    </main>
+        </main>
+    </div>{{-- /content wrapper --}}
 
     <!-- Global Image Modal -->
     <div id="global-image-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black bg-opacity-85 backdrop-blur-sm transition-all duration-300" style="display: none;">

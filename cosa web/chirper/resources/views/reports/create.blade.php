@@ -19,7 +19,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación del Reporte (Máx. 500m del GPS)</label>
-                <div id="map" class="h-64 bg-gray-100 rounded-lg border border-gray-300"></div>
+            <div id="map" class="h-64 bg-gray-100 rounded-lg border border-gray-300 relative z-0"></div>
                 <p id="distanceWarning" class="mt-2 text-sm text-red-600 hidden">El marcador está demasiado lejos de tu ubicación real (máximo 500m).</p>
             </div>
 
@@ -60,6 +60,21 @@
                 file:text-sm file:font-semibold
                 file:bg-blue-50 file:text-blue-700
                 hover:file:bg-blue-100">
+
+                <!-- Vista previa de imagen -->
+                <div id="foto-preview-wrapper" class="hidden mt-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <p class="text-xs text-gray-500">Vista previa <span class="text-blue-500">(clic para ampliar)</span>:</p>
+                        <button type="button" id="btn-remove-foto"
+                            class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors font-medium">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            Quitar imagen
+                        </button>
+                    </div>
+                    <img id="foto-preview-img"
+                        src="" alt="Vista previa"
+                        class="clickable-image max-h-40 rounded-lg border border-gray-200 shadow-sm cursor-zoom-in object-cover transition-transform hover:scale-105">
+                </div>
             </div>
 
             <button type="submit" id="btnSubmit" disabled class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-50">
@@ -258,6 +273,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('btnGetLocation').addEventListener('click', getLocation);
     getLocation();
+
+    // ── Vista previa de foto ──────────────────────────────────
+    const fotoInput = document.getElementById('foto');
+    const previewWrapper = document.getElementById('foto-preview-wrapper');
+    const previewImg = document.getElementById('foto-preview-img');
+
+    fotoInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                previewWrapper.classList.remove('hidden');
+            };
+            reader.readAsDataURL(this.files[0]);
+        } else {
+            previewWrapper.classList.add('hidden');
+            previewImg.src = '';
+        }
+    });
+
+    document.getElementById('btn-remove-foto').addEventListener('click', function() {
+        fotoInput.value = '';
+        previewImg.src = '';
+        previewWrapper.classList.add('hidden');
+    });
 
     document.getElementById('detailedReportForm').addEventListener('submit', async function(e) {
         e.preventDefault();

@@ -10,8 +10,9 @@
             <h1 class="text-xl font-semibold tracking-tight">Registro de Inundaciones</h1>
             <p class="mt-1 text-sm text-gray-600">Listado de eventos de inundación consolidados.</p>
         </div>
-        <a href="{{ route('reports.create', [], false) }}" class="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2">
-            Nuevo reporte
+        <a href="{{ route('reports.create', [], false) }}" class="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-white font-medium shadow hover:bg-blue-700 transition-transform hover:scale-105">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Nuevo Reporte
         </a>
     </div>
 

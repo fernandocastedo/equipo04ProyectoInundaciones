@@ -162,6 +162,10 @@ class ReporteController extends Controller
                 'validador_id' => $request->user()->carnet,
             ]);
 
+            // Resolver y persistir el municipio usando point-in-polygon
+            // sobre las coordenadas del primer reporte (= centroide inicial).
+            $inundacion->resolverMunicipio();
+
             $reporte->update([
                 'estado_validacion' => Reporte::VALIDACION_ACEPTADO,
                 'inundacion_id'     => $inundacion->id,

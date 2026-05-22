@@ -189,8 +189,14 @@
 
     let echoInstance   = null;
     let activeCarnet   = null;
-    let activeChannel  = null;
-    let unreadCount    = 0;
+    let panelOpen      = false;
+
+    const contactButtons = new Map();
+    const conversationState = new Map();
+    const subscribedChannels = new Set();
+    const pendingSubscriptions = new Set();
+    let authoritiesCache = [];
+    let backgroundSyncTimer = null;
 
     // ── DOM refs ──────────────────────────────────────────────────────────────
     const fab          = document.getElementById('chat-fab');
@@ -227,19 +233,122 @@
         return { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' };
     }
 
-    // ── Badge de no leídos ────────────────────────────────────────────────────
-    function setUnread(n) {
-        unreadCount = n;
-        if (n > 0 && panel.style.display === 'none') {
-            badge.textContent = n > 99 ? '99+' : n;
+    function parseMessageId(msg) {
+        const value = Number.parseInt(String(msg?.id ?? ''), 10);
+        return Number.isNaN(value) ? null : value;
+    }
+
+    function conversationKey(carnet) {
+        return `chat:last_seen:${MY_CARNET}:${carnet}`;
+    }
+
+    function getConversationState(carnet) {
+        if (!conversationState.has(carnet)) {
+            const rawStored = window.localStorage.getItem(conversationKey(carnet));
+            const stored = rawStored === null ? -1 : Number.parseInt(rawStored, 10);
+            conversationState.set(carnet, {
+                messages: [],
+                loaded: false,
+                lastSeenId: Number.isNaN(stored) ? -1 : stored,
+                unreadCount: 0,
+            });
+        }
+
+        return conversationState.get(carnet);
+    }
+
+    function latestNumericMessageId(messages) {
+        return messages.reduce((latest, msg) => {
+            const value = parseMessageId(msg);
+            return value !== null && value > latest ? value : latest;
+        }, 0);
+    }
+
+    function updateFabBadge() {
+        const totalUnread = [...conversationState.values()].reduce((total, state) => total + (state.unreadCount || 0), 0);
+
+        if (totalUnread > 0 && !panelOpen) {
+            badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
             badge.style.display = 'flex';
         } else {
             badge.style.display = 'none';
         }
     }
 
-    // ── Renderizar un mensaje ─────────────────────────────────────────────────
-    function renderMessage(msg) {
+    function updateContactBadge(carnet) {
+        const btn = contactButtons.get(carnet);
+        if (!btn) return;
+
+        const state = getConversationState(carnet);
+        const badgeEl = btn.querySelector('.contact-unread-badge');
+
+        if (!badgeEl) return;
+
+        if (state.unreadCount > 0) {
+            badgeEl.textContent = state.unreadCount > 9 ? '9+' : String(state.unreadCount);
+            badgeEl.style.display = 'flex';
+        } else {
+            badgeEl.style.display = 'none';
+        }
+    }
+
+    function updateUnreadIndicators() {
+        updateFabBadge();
+        contactButtons.forEach((_, carnet) => updateContactBadge(carnet));
+    }
+
+    function markConversationSeen(carnet) {
+        if (!carnet) return;
+
+        const state = getConversationState(carnet);
+        const latestId = latestNumericMessageId(state.messages);
+
+        state.lastSeenId = latestId;
+        state.unreadCount = 0;
+        window.localStorage.setItem(conversationKey(carnet), String(latestId));
+        updateUnreadIndicators();
+    }
+
+    function createSeparatorNode() {
+        const separator = document.createElement('div');
+        separator.style.cssText = `
+            display:flex; align-items:center; gap:8px; margin:6px 0; color:rgba(255,255,255,0.45);
+            font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
+        `;
+        separator.innerHTML = `
+            <div style="height:1px; flex:1; background:rgba(255,255,255,0.14);"></div>
+            <span style="white-space:nowrap;">Mensajes no vistos</span>
+            <div style="height:1px; flex:1; background:rgba(255,255,255,0.14);"></div>
+        `;
+        return separator;
+    }
+
+    function normalizeConversation(messages, carnet) {
+        const state = getConversationState(carnet);
+        state.messages = messages.map((msg) => ({
+            id: msg.id,
+            sender_carnet: String(msg.sender_carnet ?? ''),
+            sender_name: String(msg.sender_name ?? ''),
+            receiver_carnet: String(msg.receiver_carnet ?? ''),
+            message: String(msg.message ?? ''),
+            created_at: String(msg.created_at ?? ''),
+        }));
+        state.loaded = true;
+
+        if (state.lastSeenId === -1 && state.messages.length > 0) {
+            state.lastSeenId = latestNumericMessageId(state.messages);
+            window.localStorage.setItem(conversationKey(carnet), String(state.lastSeenId));
+        }
+
+        state.unreadCount = state.messages.reduce((count, msg) => {
+            const msgId = parseMessageId(msg);
+            if (msg.sender_carnet === MY_CARNET) return count;
+            if (msgId === null) return count;
+            return msgId > state.lastSeenId ? count + 1 : count;
+        }, 0);
+    }
+
+    function createMessageNode(msg) {
         const isMine = msg.sender_carnet === MY_CARNET;
         const div = document.createElement('div');
         div.style.cssText = `
@@ -257,7 +366,69 @@
             ">${escHtml(msg.message)}</div>
             <span style="color:rgba(255,255,255,0.3);font-size:10px;margin:0 4px;">${fmtTime(msg.created_at)}</span>
         `;
-        messagesEl.appendChild(div);
+        return div;
+    }
+
+    function renderConversation(carnet) {
+        const state = getConversationState(carnet);
+        messagesEl.innerHTML = '';
+
+        if (!state.messages.length) {
+            messagesEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);font-size:12px;padding:20px;">Sin mensajes aún. ¡Empezá la conversación!</div>';
+            return;
+        }
+
+        let separatorPlaced = false;
+        state.messages.forEach((msg) => {
+            const msgId = parseMessageId(msg);
+            const isUnreadIncoming = msg.sender_carnet !== MY_CARNET && msgId !== null && msgId > state.lastSeenId;
+
+            if (!separatorPlaced && state.lastSeenId > 0 && isUnreadIncoming) {
+                messagesEl.appendChild(createSeparatorNode());
+                separatorPlaced = true;
+            }
+
+            messagesEl.appendChild(createMessageNode(msg));
+        });
+
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function upsertMessage(carnet, msg, options = {}) {
+        const state = getConversationState(carnet);
+        const messageId = String(msg.id ?? '');
+
+        if (messageId && state.messages.some((existing) => String(existing.id ?? '') === messageId)) {
+            return false;
+        }
+
+        state.messages.push({
+            id: msg.id,
+            sender_carnet: String(msg.sender_carnet ?? ''),
+            sender_name: String(msg.sender_name ?? ''),
+            receiver_carnet: String(msg.receiver_carnet ?? ''),
+            message: String(msg.message ?? ''),
+            created_at: String(msg.created_at ?? ''),
+        });
+        state.loaded = true;
+
+        const msgId = parseMessageId(msg);
+        if (msg.sender_carnet !== MY_CARNET && msgId !== null && msgId > state.lastSeenId) {
+            state.unreadCount += 1;
+        }
+
+        if (options.render === true && panelOpen && activeCarnet === carnet) {
+            renderConversation(carnet);
+        } else {
+            updateUnreadIndicators();
+        }
+
+        return true;
+    }
+
+    // ── Renderizar un mensaje ─────────────────────────────────────────────────
+    function renderMessage(msg) {
+        messagesEl.appendChild(createMessageNode(msg));
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
@@ -274,34 +445,89 @@
                 headers: { Accept: 'application/json' },
             });
             const msgs = await res.json();
-            messagesEl.innerHTML = '';
-            if (msgs.length === 0) {
-                messagesEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);font-size:12px;padding:20px;">Sin mensajes aún. ¡Empezá la conversación!</div>';
-            } else {
-                msgs.forEach(renderMessage);
+
+            normalizeConversation(msgs, carnet);
+            if (activeCarnet === carnet) {
+                renderConversation(carnet);
             }
+            updateUnreadIndicators();
         } catch {
             messagesEl.innerHTML = '<div style="text-align:center;color:#f87171;font-size:12px;padding:20px;">Error al cargar mensajes.</div>';
         }
     }
 
+    async function refreshConversation(carnet) {
+        try {
+            const res = await fetch(`${HIST_BASE}/${encodeURIComponent(carnet)}`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+
+            if (!res.ok) return;
+
+            const msgs = await res.json();
+            normalizeConversation(msgs, carnet);
+
+            if (panelOpen && activeCarnet === carnet) {
+                renderConversation(carnet);
+            }
+        } catch {
+            // Ignore transient errors in the background sync loop.
+        }
+    }
+
+    async function warmBackgroundState() {
+        if (authoritiesCache.length === 0) {
+            return;
+        }
+
+        await Promise.all(authoritiesCache.map((auth) => refreshConversation(auth.carnet)));
+        updateUnreadIndicators();
+    }
+
+    function startBackgroundSync() {
+        if (backgroundSyncTimer) {
+            window.clearInterval(backgroundSyncTimer);
+        }
+
+        backgroundSyncTimer = window.setInterval(() => {
+            warmBackgroundState();
+        }, 12000);
+    }
+
     // ── Suscribir al canal Reverb ─────────────────────────────────────────────
     function subscribeToChannel(targetCarnet) {
-        if (!echoInstance) return;
-        if (activeChannel) {
-            echoInstance.leave('private-' + channelName(MY_CARNET, activeCarnet));
+        if (!targetCarnet || targetCarnet === MY_CARNET) return;
+
+        if (!echoInstance) {
+            pendingSubscriptions.add(targetCarnet);
+            return;
         }
-        activeCarnet  = targetCarnet;
-        activeChannel = echoInstance
-            .private(channelName(MY_CARNET, targetCarnet))
+
+        const channel = channelName(MY_CARNET, targetCarnet);
+        if (subscribedChannels.has(channel)) {
+            return;
+        }
+
+        subscribedChannels.add(channel);
+        echoInstance
+            .private(channel)
             .listen('.message.sent', (data) => {
-                // Si el panel está visible y es de este chat, renderizar directo
-                if (panel.style.display !== 'none' && data.sender_carnet === targetCarnet) {
-                    renderMessage(data);
-                } else if (data.sender_carnet === targetCarnet) {
-                    setUnread(unreadCount + 1);
+                const otherCarnet = data.sender_carnet === MY_CARNET ? data.receiver_carnet : data.sender_carnet;
+                if (!otherCarnet) return;
+
+                const wasActive = panelOpen && activeCarnet === otherCarnet;
+                const inserted = upsertMessage(otherCarnet, data, { render: wasActive });
+
+                if (!inserted && wasActive) {
+                    renderConversation(otherCarnet);
                 }
             });
+    }
+
+    function syncPendingSubscriptions() {
+        pendingSubscriptions.forEach((carnet) => subscribeToChannel(carnet));
+        pendingSubscriptions.clear();
     }
 
     // ── Inicializar Echo con Reverb ───────────────────────────────────────────
@@ -309,6 +535,7 @@
         // window.Echo es inicializado por app.js; esperamos brevemente por si aún no cargó
         if (typeof window.Echo !== 'undefined') {
             echoInstance = window.Echo;
+            syncPendingSubscriptions();
             return;
         }
         // Retry progresivo para evitar carrera de carga entre scripts
@@ -318,6 +545,7 @@
             if (typeof window.Echo !== 'undefined') {
                 echoInstance = window.Echo;
                 clearInterval(timer);
+                syncPendingSubscriptions();
                 return;
             }
 
@@ -345,23 +573,41 @@
                 return;
             }
 
+            authoritiesCache = authorities;
+
             authorities.forEach(auth => {
                 const btn = document.createElement('button');
                 btn.className = 'contact-btn';
                 btn.dataset.carnet = auth.carnet;
                 btn.title = auth.name;
                 btn.innerHTML = `
-                    <div style="
-                        width:36px;height:36px;border-radius:50%;
-                        background:linear-gradient(135deg,#1e40af,#6366f1);
-                        display:flex;align-items:center;justify-content:center;
-                        font-weight:700;font-size:14px;color:white;flex-shrink:0;
-                    ">${escHtml(auth.initials)}</div>
+                    <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
+                        <div style="
+                            width:36px;height:36px;border-radius:50%;
+                            background:linear-gradient(135deg,#1e40af,#6366f1);
+                            display:flex;align-items:center;justify-content:center;
+                            font-weight:700;font-size:14px;color:white;
+                        ">${escHtml(auth.initials)}</div>
+                        <span class="contact-unread-badge" style="
+                            display:none; position:absolute; top:-5px; right:-5px;
+                            min-width:18px; height:18px; padding:0 4px;
+                            background:#ef4444; color:white; border-radius:999px;
+                            font-size:10px; font-weight:700; align-items:center; justify-content:center;
+                            border:2px solid #0f172a;
+                        ">0</span>
+                    </div>
                     <span style="font-size:9px;color:rgba(255,255,255,0.7);text-align:center;word-break:break-word;line-height:1.2;">${escHtml(auth.name)}</span>
                 `;
                 btn.addEventListener('click', () => selectContact(auth, btn));
                 contactsList.appendChild(btn);
+                contactButtons.set(auth.carnet, btn);
+                subscribeToChannel(auth.carnet);
+                updateContactBadge(auth.carnet);
             });
+
+            updateUnreadIndicators();
+            warmBackgroundState();
+            startBackgroundSync();
         } catch (e) {
             contactsList.innerHTML = '<div style="color:#f87171;font-size:11px;text-align:center;padding:8px;">Error</div>';
         }
@@ -371,8 +617,14 @@
     function selectContact(auth, btn) {
         document.querySelectorAll('.contact-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+
+        if (activeCarnet && activeCarnet !== auth.carnet) {
+            markConversationSeen(activeCarnet);
+        }
+
         subtitle.textContent = auth.name;
-        setUnread(0);
+        activeCarnet = auth.carnet;
+        panelOpen = true;
         loadHistory(auth.carnet);
         subscribeToChannel(auth.carnet);
         inputEl.focus();
@@ -383,29 +635,55 @@
         const text = inputEl.value.trim();
         if (!text || !activeCarnet) return;
 
+        const targetCarnet = activeCarnet;
+
         inputEl.value = '';
         inputEl.style.height = 'auto';
         sendBtn.style.opacity = '0.5';
 
         // Renderizar optimista
-        renderMessage({
+        upsertMessage(targetCarnet, {
+            id: `tmp-${Date.now()}`,
             sender_carnet: MY_CARNET,
             sender_name: MY_NAME,
-            receiver_carnet: activeCarnet,
+            receiver_carnet: targetCarnet,
             message: text,
             created_at: new Date().toISOString(),
-        });
+        }, { render: true });
+
+        markConversationSeen(targetCarnet);
 
         try {
             const res = await fetch(STORE_URL, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: csrfHeaders(),
-                body: JSON.stringify({ receiver_carnet: activeCarnet, message: text }),
+                body: JSON.stringify({ receiver_carnet: targetCarnet, message: text }),
             });
             if (!res.ok) {
                 throw new Error('store_failed');
             }
+
+            const saved = await res.json();
+            const state = getConversationState(targetCarnet);
+            const tempIndex = state.messages.findIndex((msg) => String(msg.id ?? '').startsWith('tmp-'));
+            const savedMessage = {
+                id: saved.id,
+                sender_carnet: saved.sender_carnet,
+                sender_name: saved.sender_name,
+                receiver_carnet: saved.receiver_carnet,
+                message: saved.message,
+                created_at: saved.created_at,
+            };
+
+            if (tempIndex >= 0) {
+                state.messages[tempIndex] = savedMessage;
+            } else {
+                upsertMessage(targetCarnet, savedMessage, { render: false });
+            }
+
+            renderConversation(targetCarnet);
+            markConversationSeen(targetCarnet);
         } catch (e) {
             console.error('Error enviando mensaje:', e);
         } finally {
@@ -415,15 +693,30 @@
 
     // ── Eventos UI ────────────────────────────────────────────────────────────
     fab.addEventListener('click', () => {
-        const isOpen = panel.style.display === 'flex';
-        panel.style.display = isOpen ? 'none' : 'flex';
-        if (!isOpen) {
-            setUnread(0);
+        const isOpen = panelOpen;
+        panelOpen = !isOpen;
+        panel.style.display = panelOpen ? 'flex' : 'none';
+
+        if (panelOpen) {
+            if (activeCarnet) {
+                renderConversation(activeCarnet);
+            }
             if (contactsList.children.length <= 1) loadContacts();
+        } else if (activeCarnet) {
+            markConversationSeen(activeCarnet);
         }
+
+        updateUnreadIndicators();
     });
 
-    closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+    closeBtn.addEventListener('click', () => {
+        if (activeCarnet) {
+            markConversationSeen(activeCarnet);
+        }
+        panelOpen = false;
+        panel.style.display = 'none';
+        updateUnreadIndicators();
+    });
 
     sendBtn.addEventListener('click', sendMessage);
 

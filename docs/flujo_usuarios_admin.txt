@@ -1,0 +1,334 @@
+FLUJOS DEL SISTEMA - USUARIO Y ADMINISTRADOR
+Proyecto: Chirper / Inundaciones Santa Cruz
+
+Alcance del documento
+Este archivo describe el flujo funcional principal del sistema segun las rutas, controladores, middleware y vistas del proyecto. El objetivo es que sirva como base para diagramas de flujo, diagramas de actividad o recorridos de usuario. El rol administrativo en el sistema aparece como "authority" y el rol de usuario normal como "citizen".
+
+1. FLUJO GENERAL DE ACCESO AL SISTEMA
+
+1.1. Entrada inicial
+- El usuario entra a la ruta raiz "/".
+- El sistema revisa si existe una sesion con "api_token".
+- Si no hay token, redirige a "/login".
+- Si ya existe token, redirige a "/reports".
+
+1.2. Estado de autenticacion
+- La autenticacion se maneja con sesion local, no con login nativo de Laravel.
+- La sesion guarda al menos:
+  - api_token
+  - api_user
+  - intended, cuando el usuario intenta entrar a una pagina protegida sin estar autenticado.
+- Si el token existe pero falta api_user, el middleware intenta reconstruir el usuario consultando la API externa.
+- Si la API responde como no autorizada, la sesion se limpia y se manda al login.
+
+1.3. Login
+- El usuario abre el formulario de login.
+- Puede autenticarse con carnet o correo electronico, mas password.
+- Si el login es correcto:
+  - la sesion anterior se invalida,
+  - se regenera el token CSRF,
+  - se guarda api_token,
+  - se guarda api_user.
+- Si habia una ruta destino previa guardada en intended, el sistema redirige ahi.
+- Si no, manda al listado principal de reportes.
+
+1.4. Registro
+- El usuario puede ir a "/register" si no tiene sesion activa.
+- El registro crea un usuario con rol citizen por defecto.
+- El flujo de registro no crea autoridades.
+- Si el registro es exitoso, el sistema guarda la sesion y redirige a "/reports".
+
+1.5. Logout
+- El usuario o administrador pulsa cerrar sesion.
+- El sistema intenta cerrar sesion en la API externa.
+- Luego borra api_token, api_user e intended.
+- Finalmente invalida la sesion y vuelve al login.
+
+2. FLUJO DEL USUARIO NORMAL (CITIZEN)
+
+2.1. Inicio de sesion como ciudadano
+- El ciudadano entra con carnet o email y password.
+- El sistema identifica el rol citizen en api_user.
+- El layout muestra el nombre del usuario, una etiqueta con el rol y acceso a notificaciones.
+- En el menu lateral el ciudadano ve el panel general con:
+  - Reportes
+  - Mapas
+  - Logistica
+  - Victimas
+  - Cerrar sesion
+- Algunas acciones dentro de esas pantallas estaran ocultas o deshabilitadas para no administradores.
+
+2.2. Pantalla principal de reportes
+- El ciudadano aterriza en "/reports".
+- El sistema muestra tres bloques principales:
+  - Inundaciones activas,
+  - Historial de inundaciones terminadas,
+  - Mis reportes enviados.
+- El bloque "Mis reportes enviados" aparece si el usuario tiene registros, o al menos si el rol es citizen.
+- El ciudadano puede revisar el estado de sus reportes: pendiente, aceptado o rechazado.
+- Puede ver la intensidad propuesta, la fecha de ultima actualizacion y el estado de validacion.
+
+2.3. Consulta de inundaciones activas
+- El ciudadano revisa la tabla de inundaciones activas.
+- Cada registro muestra:
+  - ID,
+  - intensidad calculada,
+  - estado,
+  - quorum,
+  - fecha de creacion.
+- Cada fila se puede desplegar para ver los reportes activos vinculados dentro del TTL de 3 horas.
+- El usuario puede abrir el detalle completo de una inundacion.
+- En el historial de terminadas puede ver:
+  - intensidad historica ganadora,
+  - quorum historico,
+  - duracion,
+  - reportes vinculados.
+- El ciudadano solo puede consultar; no ve el boton de desactivar inundacion.
+
+2.4. Creacion de un reporte detallado
+- El ciudadano entra a "/reports/create".
+- El formulario pide obtener la ubicacion GPS del navegador.
+- Mientras no haya GPS valido, el envio puede quedar bloqueado.
+- El mapa muestra:
+  - la ubicacion del GPS del usuario,
+  - un radio maximo de 500 metros,
+  - un marcador movible para el punto del reporte.
+- Si el usuario arrastra el marcador demasiado lejos, el sistema bloquea el envio y muestra una advertencia.
+- El formulario tambien valida que el punto este dentro del departamento de Santa Cruz.
+- El sistema intenta autocompletar provincia y municipio segun el punto seleccionado.
+- El usuario completa:
+  - direccion opcional,
+  - intensidad propuesta,
+  - descripcion obligatoria,
+  - foto opcional de evidencia.
+- Al enviar:
+  - el sistema valida coordenadas, texto y campos geograficos,
+  - manda el reporte a la API,
+  - si todo sale bien, redirige al detalle del reporte creado,
+  - si la API responde que la sesion no sirve, vuelve al login.
+
+2.5. Seguimiento de un reporte
+- Desde el listado, el ciudadano puede abrir un reporte especifico.
+- En la vista de detalle ve:
+  - severidad,
+  - estado,
+  - fecha de creacion,
+  - latitud y longitud,
+  - direccion si existe,
+  - descripcion,
+  - prediccion basica de llegada al centro mas cercano.
+- La prediccion se calcula por distancia en linea recta a un centro de asistencia.
+- Tambien ve las respuestas asociadas al reporte, si existen.
+- El ciudadano no ve el bloque de acciones de autoridad.
+
+2.6. Notificaciones para el ciudadano
+- El frontend consulta periodicamente un feed de notificaciones.
+- Para citizen, el feed genera alertas cuando:
+  - un reporte fue rechazado,
+  - un reporte fue aceptado y vinculado a una inundacion,
+  - la inundacion asociada cambio a terminada o falsa.
+- Las notificaciones aparecen en el icono de campana.
+- Si el navegador lo permite, tambien se disparan notificaciones de escritorio.
+- El contador se actualiza segun lo no visto desde la ultima sesion.
+
+2.7. Logistica como ciudadano
+- El ciudadano puede entrar al modulo de logistica para consultar centros de asistencia.
+- Ve un mapa, la tabla de centros y filtros por provincia y municipio.
+- Puede usar el boton de "centro mas cercano" si ya guardo su ubicacion en el navegador.
+- Puede hacer click en una fila para que el mapa vuele al centro seleccionado.
+- No ve el formulario de crear, editar o eliminar centros.
+
+2.8. Registro de victimas como ciudadano
+- El ciudadano puede abrir el modulo de victimas.
+- Ve la tabla y los filtros de busqueda por inundacion, provincia, municipio y nombre.
+- Puede abrir la ficha de una victima.
+- No ve los botones de registrar, editar o eliminar.
+- La tabla se filtra del lado del cliente sin recargar la pagina.
+
+2.9. Chat como ciudadano
+- El ciudadano no deberia acceder al chat de autoridades porque la ruta esta protegida por autoridad.
+- Si intenta entrar manualmente, el sistema debe bloquear el acceso por middleware.
+
+3. FLUJO DEL ADMINISTRADOR O AUTORIDAD (AUTHORITY)
+
+3.1. Inicio de sesion como autoridad
+- La autoridad inicia sesion igual que un ciudadano.
+- El sistema detecta que el rol es authority.
+- El layout agrega contexto visual del rol y habilita acciones extra.
+- Ademas del acceso general, la autoridad puede ver paneles de moderacion y gestion.
+
+3.2. Panel principal de reportes para autoridad
+- La autoridad entra a "/reports" y ve todo lo que ve un ciudadano, mas paneles adicionales.
+- Se agregan dos bloques clave:
+  - Reportes pendientes de validacion,
+  - Reportes rechazados.
+- Tambien puede desactivar inundaciones activas desde el listado principal.
+- El panel pendiente muestra mini mapas, foto opcional, intensidad propuesta, ubicacion GPS y descripcion.
+- La autoridad usa este panel para decidir si crea una nueva inundacion, vincula el reporte a una inundacion existente, o lo rechaza.
+
+3.3. Validacion rapida de reportes
+- Desde el panel de pendientes, la autoridad puede hacer tres acciones:
+  - Crear nueva inundacion,
+  - Vincular a una inundacion activa cercana,
+  - Rechazar.
+- Si elige vincular:
+  - primero selecciona una de las inundaciones cercanas sugeridas por distancia,
+  - luego confirma la accion.
+- El sistema envia la validacion a la API protegida con el token de sesion.
+- Tras la operacion, la pagina se recarga para reflejar el nuevo estado.
+
+3.4. Cambio de estado de validacion en rechazados
+- La autoridad puede revisar reportes rechazados.
+- Desde ese panel puede cambiar el estado de validacion a:
+  - pendiente,
+  - aceptado,
+  - rechazado.
+- Si cambia a aceptado, debe seleccionar una inundacion para vincular.
+- Si no selecciona una inundacion, el sistema obliga a corregir esa decision.
+- Si el reporte queda aceptado y vinculado, se recalcula el centroide de la inundacion.
+- Si se deja como pendiente o rechazado, se limpia el vinculo.
+
+3.5. Cierre de inundaciones activas
+- En el listado de inundaciones activas, la autoridad puede usar "Desactivar".
+- Eso marca la inundacion como terminada.
+- El sistema actualiza el estado y vuelve al listado.
+- En el historial de terminadas se conserva el registro completo de reportes vinculados y la duracion total.
+
+3.6. Respuesta a un reporte especifico
+- La autoridad abre el detalle de un reporte.
+- En la seccion de acciones puede:
+  - cambiar el estado del reporte,
+  - responder con un mensaje.
+- Los estados visibles en el formulario son:
+  - open,
+  - in_progress,
+  - resolved,
+  - closed,
+  - false_report.
+- Al guardar, el sistema envia la actualizacion a la API y vuelve al detalle.
+- Las respuestas quedan visibles debajo como historial de seguimiento.
+
+3.7. Notificaciones para la autoridad
+- El feed de notificaciones muestra reportes pendientes nuevos o actualizados.
+- Cuando aparece un nuevo reporte sin vincular y pendiente, la autoridad recibe una notificacion.
+- Si un reporte pendiente cambia y sigue pendiente, tambien se notifica como actualizacion.
+- El contador del icono de campana refleja los pendientes no vistos.
+
+3.8. Gestion de logistica
+- En "/logistica" la autoridad ve el formulario de registro y la tabla completa.
+- Puede crear centros de asistencia con:
+  - nombre,
+  - provincia,
+  - municipio,
+  - hora de apertura,
+  - hora de cierre,
+  - direccion,
+  - latitud,
+  - longitud,
+  - contacto,
+  - encargado.
+- El mapa permite hacer click para autocompletar coordenadas.
+- Si la ubicacion cae dentro de Santa Cruz, el sistema intenta identificar provincia y municipio automaticamente.
+- En la tabla la autoridad puede:
+  - volar al punto en el mapa,
+  - editar el centro,
+  - eliminarlo.
+- El popup del mapa tambien ofrece el acceso a editar.
+- El sistema calcula si el centro esta abierto o cerrado segun el horario actual y lo muestra en el mapa.
+
+3.9. Consultar logistica como autoridad
+- La autoridad tambien puede usar los filtros por provincia y municipio.
+- Puede usar el boton de centro mas cercano si ya guardo su ubicacion.
+- Puede alternar capas del mapa:
+  - mapa normal,
+  - satelital,
+  - radar de lluvia,
+  - nubes,
+  - red hidrica,
+  - fronteras provinciales y municipales.
+- Esto le sirve para orientar decisiones de respuesta y derivacion.
+
+3.10. Gestion de victimas
+- En "/victimas" la autoridad ve la tabla completa y el boton de registrar victima.
+- Puede filtrar por:
+  - inundacion,
+  - provincia,
+  - municipio,
+  - nombre.
+- Puede abrir la ficha de una victima.
+- Desde la tabla puede:
+  - editar,
+  - eliminar.
+- En el formulario de crear o editar puede manejar foto de evidencia, estado, vinculacion a una inundacion y datos personales.
+- Al guardar una victima nueva, el sistema registra automaticamente al usuario autenticado como responsable del registro.
+- Si se elimina o reemplaza una foto, el sistema borra la anterior del almacenamiento.
+
+3.11. Chat entre autoridades
+- La ruta de chat esta reservada para authority.
+- La vista principal indica que el chat se usa desde un boton flotante.
+- La autoridad puede ver otras autoridades disponibles para chatear, excepto la propia.
+- El sistema excluye autoridades baneadas.
+- El historial de mensajes muestra hasta 50 mensajes por conversacion.
+- Cada mensaje se guarda y se emite en tiempo real por Reverb en un canal privado.
+- La autenticacion del canal se hace con una ruta propia "/chat/auth" usando la sesion del sistema.
+
+4. FLUJOS ALTERNOS Y DE ERROR
+
+4.1. Sesion inexistente o expirada
+- Si el usuario intenta acceder a una ruta protegida sin token, el sistema guarda la ruta original en intended y lo manda al login.
+- Si el token expiro, la API responde no autorizado y el sistema limpia la sesion.
+- Luego se redirige al login.
+
+4.2. Error al crear o actualizar
+- Si la API externa devuelve un error de validacion, el sistema lo transforma en errores de formulario.
+- Si la API devuelve un error general, se regresa a la pagina con un mensaje de error.
+- En algunos casos se conserva la entrada previa del usuario para no perder el trabajo.
+
+4.3. Restriccion por rol
+- Si una ruta de autoridad se intenta abrir con rol citizen, el middleware responde 403.
+- Eso aplica sobre todo a:
+  - respuestas a reportes,
+  - cambio de estado,
+  - desactivacion,
+  - gestion de victimas,
+  - chat,
+  - creacion, edicion y eliminacion de centros.
+
+4.4. GPS o ubicacion invalida
+- En el reporte detallado, si el navegador no da GPS o el usuario niega permisos, no se completa el flujo.
+- Si el punto esta fuera del departamento o a mas de 500 metros del GPS, el envio queda bloqueado.
+
+4.5. Sin datos geograficos suficientes
+- Si faltan coordenadas o no existen centros registrados, el calculo de ETA no puede resolverse.
+- En ese caso la ficha del reporte informa que no se pudo calcular el tiempo de llegada.
+
+5. RESUMEN DE DECISIONES PARA DIAGRAMAS
+
+5.1. Decisiones principales del ciudadano
+- ¿Tiene sesion activa?
+- ¿Puede acceder al reporte o debe iniciar sesion?
+- ¿El GPS es valido?
+- ¿La ubicacion del reporte esta dentro de Santa Cruz?
+- ¿El punto esta dentro de los 500 metros permitidos?
+- ¿Quiere enviar un reporte nuevo o revisar uno existente?
+- ¿Quiere consultar centros, victimas o mapas?
+
+5.2. Decisiones principales de la autoridad
+- ¿El reporte se crea como nueva inundacion, se vincula o se rechaza?
+- ¿El reporte rechazado vuelve a pendiente o se acepta?
+- ¿La inundacion activa se mantiene o se desactiva?
+- ¿La victima se registra, edita o elimina?
+- ¿El centro de asistencia se crea, edita o elimina?
+- ¿El mensaje de chat va a la autoridad correcta?
+
+6. ORDEN SUGERIDO PARA DIAGRAMAR
+
+- Flujo 1: invitado -> login/register -> sesion -> dashboard.
+- Flujo 2: ciudadano -> crear reporte -> validar GPS -> enviar -> seguimiento.
+- Flujo 3: autoridad -> revisar pendientes -> crear/vincular/rechazar -> notificar.
+- Flujo 4: autoridad -> abrir detalle -> responder -> cambiar estado.
+- Flujo 5: autoridad -> gestionar logistica -> mapa -> crear/editar/eliminar centro.
+- Flujo 6: autoridad -> registrar victima -> editar datos -> adjuntar o cambiar foto.
+- Flujo 7: autoridad -> chat privado -> seleccion de interlocutor -> historial -> envio en tiempo real.
+
+Fin del documento.

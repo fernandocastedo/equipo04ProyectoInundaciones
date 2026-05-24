@@ -97,12 +97,10 @@ class Inundacion extends Model
 
         return $this->reportes()
             ->where(function (Builder $query) use ($ttlInicio, $ahora) {
-                $query->whereBetween('created_at', [$ttlInicio, $ahora])
-                    // Fallback para filas legacy sin created_at.
-                    ->orWhere(function (Builder $fallback) use ($ttlInicio, $ahora) {
-                        $fallback->whereNull('created_at')
-                            ->whereBetween('updated_at', [$ttlInicio, $ahora]);
-                    });
+                // Ahora usamos 'updated_at' para que la autoridad pueda renovar
+                // el tiempo de vida de un reporte haciendo un simple 'touch()'
+                $query->whereBetween('updated_at', [$ttlInicio, $ahora])
+                      ->orWhereBetween('created_at', [$ttlInicio, $ahora]); // Fallback por si acaso
             })
             ->whereNotIn('estado_validacion', [
                 Reporte::VALIDACION_RECHAZADO,

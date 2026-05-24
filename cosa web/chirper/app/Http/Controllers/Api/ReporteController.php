@@ -172,9 +172,9 @@ class ReporteController extends Controller
                 'inundacion_id'     => $inundacion->id,
             ]);
 
-            // Disparar Job en background para calcular el polígono de inundación
-            // basado en datos de elevación (Open Topo Data). No bloquea el request.
-            CalcularPoligonoInundacion::dispatch($inundacion->id);
+            // Disparar Job en background para calcular el polígono de topografía
+            // específico de este nuevo reporte. (dispatchSync para asegurar que corra sin worker local)
+            CalcularPoligonoInundacion::dispatchSync($reporte->id);
 
             // Eager-load reportes para devolver quórum actualizado
             $inundacion->load('reportesActivosTTL');
@@ -196,9 +196,9 @@ class ReporteController extends Controller
             // Recalcular centro geográfico promediado
             $inundacion->recalcularCentroide();
 
-            // Disparar Job en background para recalcular el polígono de inundación
-            // ahora que el centroide cambió al agregar este nuevo reporte.
-            CalcularPoligonoInundacion::dispatch($inundacion->id);
+            // Disparar Job para calcular el polígono topográfico
+            // exclusivo de este reporte recién vinculado.
+            CalcularPoligonoInundacion::dispatchSync($reporte->id);
 
             // Eager-load para cómputo dinámico del quórum
             $inundacion->load('reportesActivosTTL');

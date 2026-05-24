@@ -139,6 +139,28 @@ final class ReportController
             'created_at_human'     => $r->created_at?->diffForHumans(),
         ])->toArray();
 
+        $ttlInicio = \Carbon\Carbon::now()->subHours(\App\Models\Inundacion::TTL_HORAS);
+        
+        // Reportes inactivos: Aceptados/Pendientes pero cuyo updated_at es anterior al TTL
+        $reportesInactivos = $i->reportes->filter(function ($r) use ($ttlInicio) {
+            if ($r->estado_validacion === \App\Models\Reporte::VALIDACION_RECHAZADO) {
+                return false;
+            }
+            $fecha = $r->updated_at ?? $r->created_at;
+            return $fecha && $fecha->lt($ttlInicio);
+        })->map(fn ($r) => [
+            'id'                   => $r->id,
+            'peso'                 => $r->peso,
+            'intensidad_propuesta' => $r->intensidad_propuesta,
+            'lat_reporte'          => $r->lat_reporte,
+            'long_reporte'         => $r->long_reporte,
+            'foto_path'            => $r->foto_path,
+            'estado_validacion'    => $r->estado_validacion,
+            'created_at'           => $r->created_at,
+            'created_at_human'     => $r->created_at?->diffForHumans(),
+            'caducado_hace'        => ($r->updated_at ?? $r->created_at)?->diffForHumans(),
+        ])->toArray();
+
         return [
             'id'                   => $i->id,
             'latitud'              => $i->latitud,
@@ -154,6 +176,7 @@ final class ReportController
             'esta_confirmada'      => $i->estaConfirmada(),
             'desglose_puntos'      => $i->desgloseReportes($i->reportesActivosTTL),
             'reportes_activos'     => $reportesActivos,
+            'reportes_inactivos'   => $reportesInactivos,
         ];
     }
 
@@ -335,6 +358,28 @@ final class ReportController
 
         return redirect()->route('reports.index')
             ->with('success', "Inundación #{$id} marcada como terminada correctamente.");
+    }
+
+    /**
+     * Renueva el tiempo de vida (TTL) de un reporte activo actualizando su updated_at.
+     */
+    public function renovarReporte(Request $request, int|string $id): RedirectResponse
+    {
+        $reporte = Reporte::findOrFail((int) $id);
+        
+        // Touch actualiza el 'updated_at' al instante actual
+        $reporte->touch();
+
+        if ($reporte->inundacion_id) {
+            // También podemos hacer un touch a la inundación para que suba en el listado o extienda su vida general
+            $inundacion = Inundacion::find($reporte->inundacion_id);
+            if ($inundacion) {
+                $inundacion->touch();
+            }
+        }
+
+        return redirect()->route('reports.index')
+            ->with('success', "Reporte #{$id} renovado exitosamente. Su TTL se ha extendido 3 horas.");
     }
 
     /**

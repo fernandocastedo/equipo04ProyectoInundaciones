@@ -37,6 +37,8 @@ class InundacionResource extends JsonResource
                 'id'                   => $rep->id,
                 'peso'                 => $rep->peso,
                 'intensidad_propuesta' => $rep->intensidad_propuesta,
+                'lat_reporte'          => $rep->lat_reporte,
+                'long_reporte'         => $rep->long_reporte,
                 'foto_path'            => $rep->foto_path,
                 'datos_clima_json'     => $rep->datos_clima_json,
                 'estado_validacion'    => $rep->estado_validacion,

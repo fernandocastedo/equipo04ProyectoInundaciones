@@ -37,6 +37,7 @@ class Reporte extends Model
         'foto_path',
         'estado_validacion',
         'datos_clima_json',
+        'polygon_coords',
     ];
 
     protected $casts = [
@@ -46,6 +47,7 @@ class Reporte extends Model
         'long_reporte'     => 'decimal:7',
         'peso'             => 'integer',
         'datos_clima_json' => 'array',
+        'polygon_coords'   => 'array',
     ];
 
     public function inundacion(): BelongsTo

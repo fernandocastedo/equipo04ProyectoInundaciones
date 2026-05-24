@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div class="mx-auto max-w-5xl">
@@ -57,6 +57,36 @@
             <button type="button" onclick="window.mapObj.setView([-17.78, -63.18], 7)" class="mt-2 text-xs bg-blue-50 text-blue-600 px-2 py-1.5 rounded w-full border border-blue-100 hover:bg-blue-100 pointer-events-auto transition-colors font-medium">
                 🌍 Alejar para ver completo
             </button>
+        <!-- LEYENDA DEL MAPA DE CALOR INTELIGENTE -->
+        <div id="heatmap-legend" class="absolute bottom-6 right-6 bg-white/95 backdrop-blur p-4 rounded-xl shadow-xl border border-gray-100 z-[1000] pointer-events-none transition-all duration-300 min-w-[200px]">
+            <h4 class="text-xs font-bold text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <span>Calor Inteligente</span>
+            </h4>
+            <div class="space-y-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-[#1e3a8a] opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Severidad Alta (Azul Oscuro)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-[#0ea5e9] opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Severidad Media (Celeste)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-md bg-[#2dd4bf] opacity-80 shadow-inner"></div>
+                    <span class="text-xs text-gray-600 font-medium">Severidad Baja (Turquesa)</span>
+                </div>
+                <hr class="border-gray-100 my-2" />
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 rounded-full bg-[#2563eb] border-2 border-white shadow"></div>
+                    <span class="text-xs text-gray-600 font-medium">Centro de Inundación</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-2.5 h-2.5 rounded-full bg-[#60a5fa] border border-white shadow"></div>
+                    <span class="text-xs text-gray-600 font-medium">Reportes Ciudadanos</span>
+                </div>
+            </div>
+            <p class="mt-3 text-[10px] text-gray-400 text-center italic leading-tight">Zonas modeladas con topografía real (OpenTopoMap / SRTM)</p>
         </div>
     </div>
 </div>
@@ -202,21 +232,16 @@ function initMap() {
 
     // ── 3. Overlays ───────────────────────────────────────────────────────
     const overlayMaps = {};
-    const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+    const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: true }).addTo(map);
 
     // ── 3a. Capas de Reportes ─────────────────────────────────────────────
-    const markersLayer    = L.layerGroup().addTo(map);
-    const polygonLayer    = L.layerGroup().addTo(map); // Polígonos inteligentes (activo por defecto)
-    const heatLayer       = L.heatLayer([], {
-        radius: 28,
-        blur: 18,
-        maxZoom: 17,
-        gradient: { 0.3: '#3b82f6', 0.5: '#06b6d4', 0.65: '#84cc16', 0.8: '#f59e0b', 1.0: '#ef4444' }
-    });
+    const markersLayer           = L.layerGroup().addTo(map); // Centroides principales de inundación
+    const polygonLayer           = L.layerGroup().addTo(map); // Polígonos topográficos (activo por defecto)
+    const individualReportsLayer = L.layerGroup().addTo(map); // Reportes atómicos (activo por defecto)
 
-    layerControl.addOverlay(markersLayer, "Reportes (Puntos)");
-    layerControl.addOverlay(polygonLayer, "Zonas de Inundación");
-    layerControl.addOverlay(heatLayer,    "Mapa de Calor (clásico)");
+    layerControl.addOverlay(markersLayer,           "Centros de Inundación (Centroides)");
+    layerControl.addOverlay(polygonLayer,           "Mapa de Calor Inteligente (Topográfico)");
+    layerControl.addOverlay(individualReportsLayer, "Reportes Ciudadanos (Detalle)");
 
     // ── 3b. ESRI Shaded Relief — relieve topográfico superpuesto ─────────
     const reliefOverlay = L.tileLayer(
@@ -315,14 +340,14 @@ function initMap() {
 
     // ── 5. Renderizado Inteligente de Reportes ────────────────────────────
     /**
-     * Paleta de colores por intensidad de inundación.
-     * Usada tanto para polígonos como para marcadores y heatmap.
+     * Paleta de colores por intensidad de inundación (Escala de Azules y Celestes).
+     * Usada tanto para polígonos consolidados como para marcadores y centroides.
      */
     const INTENSITY_PALETTE = {
-        alta:  { fill: '#dc2626', stroke: '#991b1b', marker: '#EA4335', heat: 1.0 },
-        media: { fill: '#f59e0b', stroke: '#b45309', marker: '#FBBC05', heat: 0.6 },
-        baja:  { fill: '#22c55e', stroke: '#15803d', marker: '#34A853', heat: 0.3 },
-        null:  { fill: '#6b7280', stroke: '#374151', marker: '#9CA3AF', heat: 0.2 },
+        alta:  { fill: '#1e3a8a', stroke: '#172554', marker: '#2563eb' },
+        media: { fill: '#0ea5e9', stroke: '#0369a1', marker: '#38bdf8' },
+        baja:  { fill: '#2dd4bf', stroke: '#0f766e', marker: '#14b8a6' },
+        null:  { fill: '#94a3b8', stroke: '#475569', marker: '#cbd5e1' },
     };
 
     function getPalette(intensidad) {
@@ -332,7 +357,14 @@ function initMap() {
     function renderReports(reportsData) {
         markersLayer.clearLayers();
         polygonLayer.clearLayers();
-        const heatData = [];
+        individualReportsLayer.clearLayers();
+
+        if (window.activeHeatLayer) {
+            map.removeLayer(window.activeHeatLayer);
+            window.activeHeatLayer = null;
+        }
+
+        const heatPoints = [];
 
         reportsData.forEach(report => {
             const lat = parseFloat(report.latitud);
@@ -342,27 +374,26 @@ function initMap() {
             const intensidad = report.intensidad_calculada || 'baja';
             const palette    = getPalette(intensidad);
 
-            // ── Peso para el heatmap ───────────────────────────────────────
-            let heatIntensity = palette.heat;
-            if (report.quorum_total && report.quorum_total > 5) {
-                heatIntensity = Math.min(1.0, heatIntensity + (report.quorum_total * 0.015));
-            }
-            heatData.push([lat, lng, heatIntensity]);
-
-            // ── Popup informativo ─────────────────────────────────────────
+            // ── Popups Informativos del Centro de Inundación ─────────────────
             const confirmadoBadge = report.esta_confirmada
-                ? '<span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full">✓ Confirmada</span>'
-                : '<span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full">⏳ En espera</span>';
+                ? '<span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">✓ Confirmada</span>'
+                : '<span class="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">⏳ En espera</span>';
 
-            const intensidadBadgeColor = { alta: 'red', media: 'yellow', baja: 'green' }[intensidad] || 'gray';
+            const intensidadBadgeColor = { alta: 'blue', media: 'sky', baja: 'teal' }[intensidad] || 'gray';
             const intensidadBadge = `<span class="inline-flex items-center bg-${intensidadBadgeColor}-100 text-${intensidadBadgeColor}-800 text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize">${intensidad}</span>`;
 
-            const desc        = report.description || 'Sin descripción.';
+            const desc        = report.description || 'Sin descripción del evento.';
             const shortDesc   = desc.length > 120 ? desc.substring(0, 120) + '…' : desc;
-            const quorumStr   = report.quorum_total !== undefined ? `<b>Quórum:</b> ${report.quorum_total} pts` : '';
+            const quorumStr   = report.quorum_total !== undefined ? `<b>Quórum Global:</b> ${report.quorum_total} pts` : '';
+            
+            let numReports = 0;
+            if (report.reportes_activos && Array.isArray(report.reportes_activos)) {
+                numReports = report.reportes_activos.length;
+            }
+
             const polygonNote = report.polygon_coords
-                ? '<p class="text-[10px] text-blue-600 mt-1">🌊 Polígono calculado por elevación</p>'
-                : '<p class="text-[10px] text-gray-400 mt-1">⏳ Calculando zona de impacto…</p>';
+                ? `<p class="text-[10px] text-blue-600 mt-1">🌊 Polígono expansivo recalculado (${numReports} reportes asociados)</p>`
+                : '<p class="text-[10px] text-gray-400 mt-1">⏳ Calculando zona de impacto topográfica…</p>';
 
             const popupContent = `
                 <div class="max-w-[240px] font-sans">
@@ -370,17 +401,18 @@ function initMap() {
                         ${intensidadBadge}
                         ${confirmadoBadge}
                     </div>
+                    <h5 class="text-xs font-bold text-gray-800 mb-1">Evento de Inundación #${report.id}</h5>
                     <p class="text-xs text-gray-700 mb-1 leading-snug">${shortDesc}</p>
                     <p class="text-xs text-gray-500">${quorumStr}</p>
                     ${polygonNote}
-                    <a href="/reports/${report.id}" class="block mt-2 text-center text-xs text-blue-600 hover:underline font-medium">Ver detalle completo →</a>
+                    <a href="/reports/${report.id}" class="block mt-2 text-center text-xs text-blue-600 hover:underline font-medium">Ver detalles de Inundación →</a>
                 </div>`;
 
-            // ── Marcador de punto ─────────────────────────────────────────
+            // ── Marcador de Centroide (Boya de Inundación con animación pulse) ──
             const customIcon = L.divIcon({
                 className: 'custom-leaflet-marker',
-                html: `<div style="background-color:${palette.marker};width:18px;height:18px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
-                iconSize: [18, 18], iconAnchor: [9, 9]
+                html: `<div style="background-color:${palette.marker};width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(0,0,0,0.3);animation:pulse 2s infinite;"></div>`,
+                iconSize: [20, 20], iconAnchor: [10, 10]
             });
 
             const marker = L.marker([lat, lng], { icon: customIcon })
@@ -389,49 +421,129 @@ function initMap() {
 
             markersLayer.addLayer(marker);
 
-            // ── Polígono inteligente (si está disponible) ─────────────────
+            // ── Polígono de Autoridad (Edición Manual) ────
+            let drawIndividualReports = true;
             if (report.polygon_coords && Array.isArray(report.polygon_coords) && report.polygon_coords.length >= 3) {
-                // Los coords están en formato [[lat, lng], ...] — directo para Leaflet
-                const floodPolygon = L.polygon(report.polygon_coords, {
-                    color:       palette.stroke,
-                    fillColor:   palette.fill,
-                    weight:      2,
-                    opacity:     0.85,
+                // Si la inundación tiene polígono, significa que la autoridad la dibujó.
+                drawIndividualReports = false;
+
+                const authorityPolygon = L.polygon(report.polygon_coords, {
+                    color:       '#1e3a8a', // Borde azul profundo
+                    fillColor:   '#3b82f6', // Relleno azul
                     fillOpacity: 0.45,
-                    smoothFactor: 1.5,
+                    weight:      3,
+                    dashArray:   '10,5', // Línea punteada de autoridad
+                    smoothFactor: 1.0,
                 });
 
-                // Animación de pulso para alta intensidad
-                if (intensidad === 'alta') {
-                    floodPolygon.on('add', function () {
-                        const el = this.getElement();
-                        if (el) el.closest('.leaflet-overlay-pane')
-                            ?.querySelectorAll(`path`)
-                            ?.forEach(p => p.style.animation = 'flood-pulse 2.5s ease-in-out infinite');
-                    });
-                }
-
-                floodPolygon.bindPopup(popupContent, { minWidth: 220 });
-                floodPolygon.on('click', () => map.flyTo([lat, lng], 14, { animate: true, duration: 0.8 }));
-                polygonLayer.addLayer(floodPolygon);
-            } else {
-                // Fallback: círculo semitransparente cuando no hay polígono calculado aún
-                const circle = L.circle([lat, lng], {
-                    radius:      120,
-                    color:       palette.stroke,
-                    fillColor:   palette.fill,
-                    weight:      1.5,
-                    opacity:     0.6,
-                    fillOpacity: 0.25,
-                    dashArray:   '6,4', // punteado para indicar que es estimado
-                });
-                circle.bindPopup(popupContent, { minWidth: 220 });
-                polygonLayer.addLayer(circle);
+                authorityPolygon.bindPopup(popupContent, { minWidth: 220 });
+                polygonLayer.addLayer(authorityPolygon);
             }
+
+            // ── Render de Reportes Ciudadanos Individuales (Detalle) ─────────
+            let hasActiveReports = false;
+            if (report.reportes_activos && Array.isArray(report.reportes_activos)) {
+                if (report.reportes_activos.length > 0) hasActiveReports = true;
+                
+                report.reportes_activos.forEach(rep => {
+                    const repLat = parseFloat(rep.lat_reporte);
+                    const repLng = parseFloat(rep.long_reporte);
+                    if (isNaN(repLat) || isNaN(repLng)) return;
+
+                    // Agregar al heatmap con peso basado directamente en SU intensidad propuesta
+                    let weight = 0.3; // baja por defecto
+                    if (rep.intensidad_propuesta === 'alta') weight = 1.0;
+                    else if (rep.intensidad_propuesta === 'media') weight = 0.6;
+                    
+                    heatPoints.push([repLat, repLng, weight]);
+
+                    // Topografía individual del reporte (el "charco" de agua)
+                    if (drawIndividualReports && rep.polygon_coords && Array.isArray(rep.polygon_coords) && rep.polygon_coords.length >= 3) {
+                        const repPolygon = L.polygon(rep.polygon_coords, {
+                            color: 'transparent', // Sin borde duro, se fusionará visualmente
+                            fillColor: '#38bdf8', // Celeste de agua somera
+                            fillOpacity: 0.3,     // Transparente para sumar opacidades si se solapan
+                            interactive: false    // No interfiere con clics
+                        });
+                        polygonLayer.addLayer(repPolygon);
+                    }
+
+                    // Si está demasiado cerca del centroide exacto, se puede dibujar igual
+                    // Un icono de punto de agua pequeño celeste
+                    const repIcon = L.divIcon({
+                        className: 'individual-report-dot',
+                        html: `<div style="background-color:#60a5fa;width:10px;height:10px;border-radius:50%;border:1.5px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                        iconSize: [10, 10], iconAnchor: [5, 5]
+                    });
+
+                    const repIntensityColor = { alta: 'blue', media: 'sky', baja: 'teal' }[rep.intensidad_propuesta] || 'gray';
+                    const repIntensityBadge = `<span class="inline-flex items-center bg-${repIntensityColor}-50 text-${repIntensityColor}-700 text-[10px] font-medium px-1.5 py-0.25 rounded capitalize">Propuesta: ${rep.intensidad_propuesta}</span>`;
+
+                    const repPopupContent = `
+                        <div class="max-w-[200px] font-sans text-xs">
+                            <div class="flex items-center gap-1.5 mb-1.5">
+                                <span class="bg-gray-100 text-gray-800 text-[9px] font-bold px-1.5 py-0.5 rounded">Reporte #${rep.id}</span>
+                                ${repIntensityBadge}
+                            </div>
+                            <p class="text-gray-600 font-medium">Aportó <b>${rep.peso} pts</b> al quórum.</p>
+                            <p class="text-[10px] text-gray-400 mt-1">${rep.created_at_human || ''}</p>
+                        </div>`;
+
+                    const repMarker = L.marker([repLat, repLng], { icon: repIcon })
+                        .bindPopup(repPopupContent, { minWidth: 160 });
+
+                    individualReportsLayer.addLayer(repMarker);
+                });
+
+                // --- LÓGICA DE PUENTES TERMICOS Y TOPOGRÁFICOS ---
+                // Si hay más de un reporte activo, calculamos la distancia entre ellos y añadimos manchas intermedias
+                if (drawIndividualReports && report.reportes_activos.length > 1) {
+                    let activeReps = report.reportes_activos;
+                    for (let i = 0; i < activeReps.length; i++) {
+                        for (let j = i + 1; j < activeReps.length; j++) {
+                            let p1 = L.latLng(activeReps[i].lat_reporte, activeReps[i].long_reporte);
+                            let p2 = L.latLng(activeReps[j].lat_reporte, activeReps[j].long_reporte);
+                            let dist = p1.distanceTo(p2);
+                            
+                            // Si están a menos de 250 metros, se conectan con manchas (puente de inundación)
+                            if (dist > 10 && dist <= 250) {
+                                // 1 punto térmico cada 15 metros para asegurar continuidad sin círculos duros
+                                let steps = Math.floor(dist / 15);
+                                for (let k = 1; k < steps; k++) {
+                                    let fraction = k / steps;
+                                    let interLat = p1.lat + (p2.lat - p1.lat) * fraction;
+                                    let interLng = p1.lng + (p2.lng - p1.lng) * fraction;
+                                    
+                                    // Mancha térmica de conexión (heatmap fusion pura, sin polígonos)
+                                    // Peso 0.35 para que el gradiente se note pero no alcance el nivel 'alta' (1.0)
+                                    heatPoints.push([interLat, interLng, 0.35]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Si no hay reportes activos, NO inyectamos el centroide artificial oscuro
+            // Solo los reportes reales pintarán calor para mayor precisión clínica.
         });
 
-        // Actualizar Heatmap
-        heatLayer.setLatLngs(heatData);
+        // ── Creación Final de la Capa de Degradado ──────────────────────────
+        if (heatPoints.length > 0) {
+            window.activeHeatLayer = L.heatLayer(heatPoints, {
+                radius: 75,       // Aumentado drásticamente para que se toquen incluso al hacer zoom in
+                blur: 45,         // Suavizado controlado para no perder la solidez
+                minOpacity: 0.4,  // Clave: Esto hace que el "puente" y los bordes sean mucho menos transparentes
+                maxZoom: 18,      // Mantener la intensidad correcta en niveles de zoom altos
+                gradient: {
+                    0.2: '#38bdf8', // Bordes (Agua somera escurriendo hacia zonas bajas)
+                    0.5: '#2563eb', // Zonas intermedias (Intensidad media)
+                    1.0: '#1e3a8a'  // Epicentro profundo (Intensidad alta)
+                }
+            });
+            // Añadir el heatmap al polygonLayer para que ambos se toggleen juntos con el checkbox
+            polygonLayer.addLayer(window.activeHeatLayer);
+        }
     }
 
     // Renderizado inicial

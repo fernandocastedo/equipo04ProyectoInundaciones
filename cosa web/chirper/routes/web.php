@@ -50,6 +50,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::post('/reports/{id}/responses', [ReportController::class, 'storeResponse'])->name('reports.responses.store');
         Route::post('/reports/{id}/status', [ReportController::class, 'updateestado'])->name('reports.status.update');
         Route::post('/reports/{id}/desactivar', [ReportController::class, 'desactivar'])->name('reports.desactivar');
+        Route::post('/reports/renovar/{id}', [ReportController::class, 'renovarReporte'])->name('reports.renovar');
         Route::post('/reports/rechazados/{id}/estado-validacion', [ReportController::class, 'updateEstadoValidacion'])->name('reports.rechazados.estado_validacion.update');
         Route::get('/reports/notifications/latest', [ReportController::class, 'latestForNotifications'])->name('reports.notifications.latest');
     });

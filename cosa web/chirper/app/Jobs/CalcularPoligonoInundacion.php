@@ -59,171 +59,200 @@ final class CalcularPoligonoInundacion implements ShouldQueue
      * Un punto se incluye si su elevación <= centroide + tolerancia.
      * Permite que pequeñas áreas planas (canales, pavimento) se incluyan.
      */
-    private const ELEVATION_TOLERANCE_M = 2.0;
+    private const ELEVATION_TOLERANCE_M = 0.5;
 
     public function __construct(
-        private readonly int $inundacionId
+        private readonly int $reporteId
     ) {}
 
     public function handle(ElevationController $elevationService): void
     {
-        $inundacion = Inundacion::find($this->inundacionId);
+        $reporte = \App\Models\Reporte::find($this->reporteId);
 
-        if ($inundacion === null) {
-            Log::warning("CalcularPoligonoInundacion: Inundacion #{$this->inundacionId} no encontrada.");
+        if ($reporte === null) {
+            Log::warning("CalcularPoligonoInundacion: Reporte #{$this->reporteId} no encontrado.");
             return;
         }
 
-        // No sobreescribir polígonos editados manualmente por autoridades
-        if ($inundacion->polygon_editado_autoridad) {
-            Log::info("CalcularPoligonoInundacion: #{$this->inundacionId} tiene polígono manual, se omite recálculo.");
+        // Si ya tiene polígono (ej. recalculado manualmente), evitar doble cálculo
+        if (!empty($reporte->polygon_coords)) {
+            Log::info("CalcularPoligonoInundacion: Reporte #{$this->reporteId} ya tiene polígono topográfico.");
             return;
         }
 
-        // Solo calcular para inundaciones activas
-        if ($inundacion->estado !== Inundacion::ESTADO_ACTIVA) {
+        $lat = (float) $reporte->lat_reporte;
+        $lng = (float) $reporte->long_reporte;
+
+        if ($lat === 0.0 && $lng === 0.0) {
             return;
         }
 
-        $centroLat = (float) $inundacion->latitud;
-        $centroLng = (float) $inundacion->longitud;
+        $intensidad = $reporte->intensidad_propuesta ?? 'media';
+        
+        $radius = match ($intensidad) {
+            'alta' => 60.0,
+            'media' => 35.0,
+            'baja' => 15.0,
+            default => 35.0,
+        };
 
-        if ($centroLat === 0.0 && $centroLng === 0.0) {
-            Log::warning("CalcularPoligonoInundacion: #{$this->inundacionId} tiene coordenadas nulas.");
-            return;
+        Log::info("CalcularPoligonoInundacion: Calculando topografía para Reporte #{$this->reporteId}. Radio: {$radius}m");
+
+        $candidatePoints = [];
+        for ($i = 0; $i < self::POINTS_PER_RING; $i++) {
+            $angleDeg = ($i / self::POINTS_PER_RING) * 360.0;
+            [$cLat, $cLng] = $this->offsetPoint($lat, $lng, $radius, $angleDeg);
+            $candidatePoints[] = [
+                'lat' => $cLat,
+                'lng' => $cLng,
+            ];
         }
 
-        Log::info("CalcularPoligonoInundacion: Calculando polígono para #{$this->inundacionId} en ({$centroLat}, {$centroLng}).");
+        // Preparar batch: [Centro] + [8 Candidatos] = 9 puntos
+        $apiPoints = ["{$lat},{$lng}"];
+        foreach ($candidatePoints as $cp) {
+            $apiPoints[] = "{$cp['lat']},{$cp['lng']}";
+        }
 
-        // 1. Generar todos los puntos (centro + anillos)
-        $candidatePoints = $this->generateCandidatePoints($centroLat, $centroLng);
-
-        // 2. Construir la lista de puntos para la API (centro primero)
-        $allPointsForApi = array_merge(
-            ["{$centroLat},{$centroLng}"],
-            array_map(fn ($p) => "{$p['lat']},{$p['lng']}", $candidatePoints)
-        );
-
-        // 3. Consultar elevaciones en batch
         try {
-            $elevations = $elevationService->fetchElevations($allPointsForApi);
+            $elevations = $elevationService->fetchElevations($apiPoints);
         } catch (\Exception $e) {
-            Log::error("CalcularPoligonoInundacion: Error al consultar elevaciones para #{$this->inundacionId}.", [
-                'error' => $e->getMessage(),
-            ]);
-            $this->release(60); // Reintentar en 60 segundos
+            Log::error("CalcularPoligonoInundacion: Error API para Reporte #{$this->reporteId}: " . $e->getMessage());
+            $this->release(60);
             return;
         }
 
-        // 4. Obtener la elevación del centroide (primer resultado)
-        $centroElevation = $elevations[0]['elevation'] ?? null;
-
-        if ($centroElevation === null) {
-            Log::warning("CalcularPoligonoInundacion: No se pudo obtener la elevación del centroide #{$this->inundacionId}.");
-            // Usar un polígono circular de fallback si no hay datos de elevación
-            $polygon = $this->buildCircularFallback($centroLat, $centroLng, 150);
-            $this->savePolygon($inundacion, $polygon);
+        $originElevation = $elevations[0]['elevation'] ?? null;
+        if ($originElevation === null) {
+            Log::warning("CalcularPoligonoInundacion: Sin elevación central para Reporte #{$this->reporteId}.");
             return;
         }
 
-        // 5. Filtrar puntos por elevación (agua fluye hacia abajo)
-        $validPoints = [['lat' => $centroLat, 'lng' => $centroLng]]; // El centro siempre está incluido
+        $waterPoints = [['lat' => $lat, 'lng' => $lng]];
 
-        foreach ($candidatePoints as $idx => $point) {
-            $elev = $elevations[$idx + 1]['elevation'] ?? null; // +1 porque índice 0 es el centro
-
-            if ($elev === null) {
-                continue; // Si no hay dato, excluir el punto por seguridad
+        foreach ($candidatePoints as $idx => $cp) {
+            $candidateElevation = $elevations[$idx + 1]['elevation'] ?? null;
+            if ($candidateElevation === null) {
+                continue;
             }
 
-            // El agua fluye hacia puntos más bajos o igual de altos (con tolerancia)
-            if ($elev <= ($centroElevation + self::ELEVATION_TOLERANCE_M)) {
-                $validPoints[] = ['lat' => $point['lat'], 'lng' => $point['lng']];
+            // El agua fluye si el terreno es más bajo o igual
+            if ($candidateElevation <= ($originElevation + self::ELEVATION_TOLERANCE_M)) {
+                $waterPoints[] = ['lat' => $cp['lat'], 'lng' => $cp['lng']];
             }
         }
 
-        // 6. Si hay muy pocos puntos válidos, usar los del anillo más cercano como mínimo
-        if (count($validPoints) < 4) {
-            Log::info("CalcularPoligonoInundacion: Pocos puntos válidos para #{$this->inundacionId}, usando fallback circular.");
-            $polygon = $this->buildCircularFallback($centroLat, $centroLng, self::RINGS_METERS[0]);
-        } else {
-            // 7. Ordenar puntos por ángulo para formar un polígono válido (convex hull simplificado)
-            $polygon = $this->sortPointsByAngle($validPoints, $centroLat, $centroLng);
+        $polygon = $this->calculateConvexHull($waterPoints);
+
+        // Fallback si es un hueco (menos de 3 puntos)
+        if (count($polygon) < 3) {
+            // Un radio pequeño fijo para el fallback del reporte
+            $polygon = $this->buildCircularFallback($lat, $lng, $radius);
         }
 
-        // 8. Guardar el polígono
-        $this->savePolygon($inundacion, $polygon);
+        $reporte->update(['polygon_coords' => $polygon]);
 
-        Log::info("CalcularPoligonoInundacion: Polígono guardado para #{$this->inundacionId} con " . count($polygon) . " vértices.");
+        Log::info("CalcularPoligonoInundacion: Topografía guardada para Reporte #{$this->reporteId}.");
     }
 
     /**
-     * Genera los puntos candidatos en anillos concéntricos alrededor del centroide.
+     * Calcula el Casco Convexo (Convex Hull) de un conjunto de puntos usando
+     * el algoritmo Monotone Chain de Andrew (O(N log N)).
      *
-     * @return array<int, array{lat: float, lng: float, ring: int}>
+     * @param array<int, array{lat: float, lng: float}> $points
+     * @return array<int, array{float, float}> Polígono ordenado
      */
-    private function generateCandidatePoints(float $centroLat, float $centroLng): array
+    private function calculateConvexHull(array $points): array
     {
-        $points = [];
-
-        foreach (self::RINGS_METERS as $ringIdx => $distanceMeters) {
-            for ($i = 0; $i < self::POINTS_PER_RING; $i++) {
-                $angleDeg = ($i / self::POINTS_PER_RING) * 360.0;
-                [$lat, $lng] = $this->offsetPoint($centroLat, $centroLng, $distanceMeters, $angleDeg);
-                $points[] = ['lat' => $lat, 'lng' => $lng, 'ring' => $ringIdx];
+        // Filtrar duplicados muy cercanos para mejorar la precisión del cálculo
+        $unique = [];
+        foreach ($points as $p) {
+            $dup = false;
+            foreach ($unique as $u) {
+                $distLat = abs($p['lat'] - $u['lat']);
+                $distLng = abs($p['lng'] - $u['lng']);
+                if ($distLat < 0.00002 && $distLng < 0.00002) {
+                    $dup = true;
+                    break;
+                }
+            }
+            if (!$dup) {
+                $unique[] = $p;
             }
         }
 
-        return $points;
-    }
+        $n = count($unique);
+        if ($n <= 3) {
+            return array_map(fn($p) => [$p['lat'], $p['lng']], $unique);
+        }
 
-    /**
-     * Calcula un punto a una distancia y ángulo dado desde el origen.
-     * Usa conversión esférica simple (suficientemente precisa a escala de 500m).
-     *
-     * @return array{float, float} [lat, lng]
-     */
-    private function offsetPoint(float $lat, float $lng, float $distanceMeters, float $angleDeg): array
-    {
-        $earthRadius = 6371000.0; // metros
-        $angleRad    = deg2rad($angleDeg);
-
-        $dLat = ($distanceMeters * cos($angleRad)) / $earthRadius;
-        $dLng = ($distanceMeters * sin($angleRad)) / ($earthRadius * cos(deg2rad($lat)));
-
-        return [
-            $lat + rad2deg($dLat),
-            $lng + rad2deg($dLng),
-        ];
-    }
-
-    /**
-     * Ordena los puntos por ángulo polar alrededor del centroide.
-     * Esto garantiza que el polígono dibujado sea válido (sin auto-intersecciones).
-     *
-     * @param  array<int, array{lat: float, lng: float}>  $points
-     * @return array<int, array{float, float}>  Array de [lat, lng] ordenado
-     */
-    private function sortPointsByAngle(array $points, float $centroLat, float $centroLng): array
-    {
-        usort($points, function (array $a, array $b) use ($centroLat, $centroLng): int {
-            $angleA = atan2($a['lat'] - $centroLat, $a['lng'] - $centroLng);
-            $angleB = atan2($b['lat'] - $centroLat, $b['lng'] - $centroLng);
-            return $angleA <=> $angleB;
+        // Ordenar puntos por longitud (x), y por latitud (y) en caso de empate
+        usort($unique, function (array $a, array $b): int {
+            if ($a['lng'] != $b['lng']) {
+                return $a['lng'] <=> $b['lng'];
+            }
+            return $a['lat'] <=> $b['lat'];
         });
 
-        return array_map(fn ($p) => [$p['lat'], $p['lng']], $points);
+        // Función del producto cruzado
+        $cross = function (array $o, array $a, array $b): float {
+            return ($a['lng'] - $o['lng']) * ($b['lat'] - $o['lat']) - ($a['lat'] - $o['lat']) * ($b['lng'] - $o['lng']);
+        };
+
+        // Construir casco inferior
+        $lower = [];
+        foreach ($unique as $p) {
+            while (count($lower) >= 2 && $cross($lower[count($lower) - 2], $lower[count($lower) - 1], $p) <= 0) {
+                array_pop($lower);
+            }
+            $lower[] = $p;
+        }
+
+        // Construir casco superior
+        $upper = [];
+        for ($i = $n - 1; $i >= 0; $i--) {
+            $p = $unique[$i];
+            while (count($upper) >= 2 && $cross($upper[count($upper) - 2], $upper[count($upper) - 1], $p) <= 0) {
+                array_pop($upper);
+            }
+            $upper[] = $p;
+        }
+
+        // Eliminar último punto de cada mitad (está duplicado en los extremos)
+        array_pop($lower);
+        array_pop($upper);
+
+        $hull = array_merge($lower, $upper);
+        return array_map(fn($p) => [$p['lat'], $p['lng']], $hull);
     }
 
     /**
-     * Construye un polígono circular de fallback cuando no hay datos de elevación.
+     * Calcula un nuevo punto (lat, lng) dado un origen, una distancia y un ángulo.
+     */
+    private function offsetPoint(float $lat, float $lng, float $distanceMeters, float $bearingDegrees): array
+    {
+        $rEarth = 6378137.0; // Radio de la tierra en metros
+        $brng = deg2rad($bearingDegrees);
+        $lat1 = deg2rad($lat);
+        $lon1 = deg2rad($lng);
+
+        $lat2 = asin(sin($lat1) * cos($distanceMeters / $rEarth) +
+                     cos($lat1) * sin($distanceMeters / $rEarth) * cos($brng));
+        $lon2 = $lon1 + atan2(sin($brng) * sin($distanceMeters / $rEarth) * cos($lat1),
+                              cos($distanceMeters / $rEarth) - sin($lat1) * sin($lat2));
+
+        return [rad2deg($lat2), rad2deg($lon2)];
+    }
+
+    /**
+     * Construye un polígono circular de fallback cuando no hay suficientes datos de elevación.
      *
      * @return array<int, array{float, float}>
      */
     private function buildCircularFallback(float $centroLat, float $centroLng, float $radiusMeters): array
     {
         $points = [];
-        $numPoints = 12; // Dodecágono — suficientemente circular
+        $numPoints = 12; // Dodecágono
 
         for ($i = 0; $i < $numPoints; $i++) {
             $angle = ($i / $numPoints) * 360.0;
@@ -234,15 +263,4 @@ final class CalcularPoligonoInundacion implements ShouldQueue
         return $points;
     }
 
-    /**
-     * Persiste el polígono calculado en la base de datos.
-     *
-     * @param  array<int, array{float, float}>  $polygon
-     */
-    private function savePolygon(Inundacion $inundacion, array $polygon): void
-    {
-        $inundacion->polygon_coords         = $polygon;
-        $inundacion->polygon_calculado_at   = now();
-        $inundacion->saveQuietly(); // sin disparar eventos adicionales
-    }
 }

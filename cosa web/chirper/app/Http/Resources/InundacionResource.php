@@ -37,6 +37,8 @@ class InundacionResource extends JsonResource
                 'id'                   => $rep->id,
                 'peso'                 => $rep->peso,
                 'intensidad_propuesta' => $rep->intensidad_propuesta,
+                'lat_reporte'          => $rep->lat_reporte,
+                'long_reporte'         => $rep->long_reporte,
                 'foto_path'            => $rep->foto_path,
                 'datos_clima_json'     => $rep->datos_clima_json,
                 'estado_validacion'    => $rep->estado_validacion,
@@ -84,6 +86,12 @@ class InundacionResource extends JsonResource
             'intensidad_calculada' => $intensidadCalc,
             'esta_confirmada'      => $estaConfirmada,
             'desglose_puntos'      => $desglosePuntos,
+
+            // ── Polígono de área de inundación (calculado por CalcularPoligonoInundacion Job) ──
+            // Array de [lat, lng] pares. Null si aún no fue calculado.
+            'polygon_coords'            => $this->polygon_coords,
+            'polygon_calculado_at'      => $this->polygon_calculado_at?->toISOString(),
+            'polygon_editado_autoridad' => (bool) $this->polygon_editado_autoridad,
 
             // ── Detalle de reportes para el panel lateral del mapa ───────
             'reportes_activos' => $reportesActivosTTL,

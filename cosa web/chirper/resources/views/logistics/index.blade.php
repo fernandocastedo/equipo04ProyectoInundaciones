@@ -365,18 +365,28 @@
             map = L.map('logistics_map', { preferCanvas: true }).setView(defaultLocation, 12);
 
             const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19,
             });
 
             const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                maxZoom: 19,
+            });
+
+            // OpenTopoMap — mapa base con curvas de nivel y relieve
+            const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+                maxZoom: 17,
+                opacity: 1.0,
             });
 
             osmLayer.addTo(map);
 
             const baseMaps = {
                 "Mapa Normal (OSM)": osmLayer,
-                "Satelital (Esri)": satelliteLayer
+                "Satelital (Esri)": satelliteLayer,
+                "Topográfico (OpenTopoMap)": topoLayer,
             };
 
             const overlayMaps = {};
@@ -385,15 +395,27 @@
             markersLayer = L.layerGroup().addTo(map); // Activo por defecto
             layerControl.addOverlay(markersLayer, "Centros de Acopio");
 
+            // Bounding box del departamento de Santa Cruz (para limitar capas externas)
+            const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
+
+            // ESRI Shaded Relief — relieve topográfico superpuesto
+            const reliefOverlay = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri',
+                opacity: 0.45,
+                bounds: santaCruzBounds,
+                minZoom: 5,
+                maxZoom: 18,
+                zIndex: 5,
+            });
+            layerControl.addOverlay(reliefOverlay, "Relieve del Terreno (ESRI)");
+
             // 4. Capas Meteorológicas (OpenWeatherMap)
             const precipLayer = L.layerGroup();
-            const cloudLayer = L.layerGroup();
+            const cloudLayer  = L.layerGroup();
             layerControl.addOverlay(precipLayer, "Radar de Lluvia (OpenWeather)");
-            layerControl.addOverlay(cloudLayer, "Nubes (OpenWeather)");
+            layerControl.addOverlay(cloudLayer,  "Nubes (OpenWeather)");
 
-            // Limitamos los requests al bounding box de Santa Cruz y a un zoom máximo nativo de 8.
-            const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
-            
             L.tileLayer('/weather/tiles/precipitation_new/{z}/{x}/{y}?v=2', {
                 opacity: 0.85,
                 attribution: '&copy; OpenWeatherMap',
@@ -418,10 +440,10 @@
 
             // Eventos para mostrar/ocultar la leyenda del radar de lluvia
             map.on('overlayadd', function(e) {
-                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
+                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "☁️ Nubes (OpenWeather)") {
                     const legend = document.getElementById('radar-legend-logistics');
                     if (legend) legend.classList.remove('hidden');
-                    
+
                     if (e.name === "Nubes (OpenWeather)") {
                         document.getElementById('radar-legend-title-log').innerHTML = '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Densidad de Nubes</span>';
                         document.getElementById('radar-legend-rain-colors-log').classList.add('hidden');
@@ -434,7 +456,7 @@
                 }
             });
             map.on('overlayremove', function(e) {
-                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
+                if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "☁️ Nubes (OpenWeather)") {
                     if (!map.hasLayer(precipLayer) && !map.hasLayer(cloudLayer)) {
                         const legend = document.getElementById('radar-legend-logistics');
                         if (legend) legend.classList.add('hidden');
@@ -460,7 +482,7 @@
                         style: { color: '#0ea5e9', weight: 1.5, opacity: 0.8 },
                         interactive: false
                     });
-                    layerControl.addOverlay(hydroLayer, "Red Hídrica");
+                    layerControl.addOverlay(hydroLayer, "💧 Red Hídrica");
                 }).catch(e => console.warn("Error cargando red hídrica", e));
 
             renderMarkers(window.centros);
@@ -629,7 +651,7 @@
                 interactive: false
             });
 
-            layerControl.addOverlay(provincesOverlay, "Fronteras Provinciales");
+            layerControl.addOverlay(provincesOverlay,     "Fronteras Provinciales");
             layerControl.addOverlay(municipalitiesOverlay, "Fronteras Municipales");
 
             fetch('/provinces.geojson').then(res => res.json()).then(data => {

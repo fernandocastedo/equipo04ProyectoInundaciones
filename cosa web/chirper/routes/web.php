@@ -35,6 +35,10 @@ Route::get('/reporte-rapido', function () {
 
 Route::get('/weather/tiles/{layer}/{z}/{x}/{y}', [\App\Http\Controllers\WeatherController::class, 'getTile'])->name('weather.tiles');
 
+// Proxy para Open Topo Data — datos de elevación del terreno
+// Usado por el Job CalcularPoligonoInundacion y opcionalmente por el frontend
+Route::get('/api/elevation', [\App\Http\Controllers\ElevationController::class, 'getElevation'])->name('elevation.get');
+
 Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/maps', [MapController::class, 'index'])->name('maps.index');
@@ -47,6 +51,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::post('/reports/{id}/responses', [ReportController::class, 'storeResponse'])->name('reports.responses.store');
         Route::post('/reports/{id}/status', [ReportController::class, 'updateestado'])->name('reports.status.update');
         Route::post('/reports/{id}/desactivar', [ReportController::class, 'desactivar'])->name('reports.desactivar');
+        Route::post('/reports/renovar/{id}', [ReportController::class, 'renovarReporte'])->name('reports.renovar');
         Route::post('/reports/rechazados/{id}/estado-validacion', [ReportController::class, 'updateEstadoValidacion'])->name('reports.rechazados.estado_validacion.update');
         Route::get('/reports/notifications/latest', [ReportController::class, 'latestForNotifications'])->name('reports.notifications.latest');
     });

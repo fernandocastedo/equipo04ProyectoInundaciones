@@ -50,7 +50,20 @@ final class VictimaController extends Controller
 
     public function create(): View
     {
-        $inundaciones = Inundacion::with('municipio.provincia')->latest()->get();
+        $inundaciones = Inundacion::with('municipio.provincia')
+            ->latest()
+            ->get()
+            ->map(fn ($i) => [
+                'id'       => $i->id,
+                'estado'   => $i->estado,
+                'latitud'  => (float) $i->latitud,
+                'longitud' => (float) $i->longitud,
+                'municipio'  => $i->municipio?->nombre ?? 'Sin municipio',
+                'provincia'  => $i->municipio?->provincia?->nombre ?? 'Sin provincia',
+                'created_at' => $i->created_at?->format('d/m/Y H:i') ?? '?',
+                'created_at_iso' => $i->created_at?->toDateString() ?? '',
+            ]);
+
         $estados      = Victima::ESTADOS;
         $estadoLabels = Victima::ESTADO_LABELS;
 
@@ -95,7 +108,20 @@ final class VictimaController extends Controller
     public function edit(int $id): View
     {
         $victima      = Victima::findOrFail($id);
-        $inundaciones = Inundacion::with('municipio.provincia')->latest()->get();
+        $inundaciones = Inundacion::with('municipio.provincia')
+            ->latest()
+            ->get()
+            ->map(fn ($i) => [
+                'id'       => $i->id,
+                'estado'   => $i->estado,
+                'latitud'  => (float) $i->latitud,
+                'longitud' => (float) $i->longitud,
+                'municipio'  => $i->municipio?->nombre ?? 'Sin municipio',
+                'provincia'  => $i->municipio?->provincia?->nombre ?? 'Sin provincia',
+                'created_at' => $i->created_at?->format('d/m/Y H:i') ?? '?',
+                'created_at_iso' => $i->created_at?->toDateString() ?? '',
+            ]);
+
         $estados      = Victima::ESTADOS;
         $estadoLabels = Victima::ESTADO_LABELS;
 

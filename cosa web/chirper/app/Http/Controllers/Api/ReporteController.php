@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\CalcularPoligonoInundacion;
 use App\Models\Reporte;
 use App\Models\Inundacion;
 use Illuminate\Http\JsonResponse;
@@ -162,10 +163,18 @@ class ReporteController extends Controller
                 'validador_id' => $request->user()->carnet,
             ]);
 
+            // Resolver y persistir el municipio usando point-in-polygon
+            // sobre las coordenadas del primer reporte (= centroide inicial).
+            $inundacion->resolverMunicipio();
+
             $reporte->update([
                 'estado_validacion' => Reporte::VALIDACION_ACEPTADO,
                 'inundacion_id'     => $inundacion->id,
             ]);
+
+            // Disparar Job en background para calcular el polígono de topografía
+            // específico de este nuevo reporte. (dispatchSync para asegurar que corra sin worker local)
+            CalcularPoligonoInundacion::dispatchSync($reporte->id);
 
             // Eager-load reportes para devolver quórum actualizado
             $inundacion->load('reportesActivosTTL');
@@ -186,6 +195,10 @@ class ReporteController extends Controller
 
             // Recalcular centro geográfico promediado
             $inundacion->recalcularCentroide();
+
+            // Disparar Job para calcular el polígono topográfico
+            // exclusivo de este reporte recién vinculado.
+            CalcularPoligonoInundacion::dispatchSync($reporte->id);
 
             // Eager-load para cómputo dinámico del quórum
             $inundacion->load('reportesActivosTTL');

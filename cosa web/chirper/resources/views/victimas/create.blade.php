@@ -34,58 +34,19 @@
         <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             <div class="px-5 py-4 bg-blue-50 border-b border-blue-100">
                 <h2 class="text-sm font-semibold text-blue-800">1. Inundación asociada</h2>
-                <p class="text-xs text-blue-600 mt-0.5">Seleccione a qué evento de inundación corresponde esta víctima.</p>
+                <p class="text-xs text-blue-600 mt-0.5">
+                    Busca y selecciona el evento de inundación al que pertenece esta víctima.
+                    <span class="font-medium">Haz clic una vez para ver el mapa, dos veces para confirmar.</span>
+                </p>
             </div>
             <div class="p-5">
-                <label for="inundacion_id" class="block text-sm font-medium text-gray-700 mb-2">
-                    Inundación <span class="text-red-500">*</span>
-                </label>
-                <select name="inundacion_id" id="inundacion_id" required
-                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500 @error('inundacion_id') border-red-300 @enderror">
-                    <option value="">— Seleccione una inundación —</option>
-                    @foreach($inundaciones as $inundacion)
-                        @php
-                            $muni  = $inundacion->municipio?->nombre ?? 'Sin municipio';
-                            $prov  = $inundacion->municipio?->provincia?->nombre ?? 'Sin provincia';
-                            $fecha = $inundacion->created_at
-                                ? \Carbon\Carbon::parse($inundacion->created_at)->format('d/m/Y H:i')
-                                : '?';
-                            $estado = ucfirst($inundacion->estado);
-                        @endphp
-                        <option value="{{ $inundacion->id }}"
-                            data-municipio="{{ $muni }}"
-                            data-provincia="{{ $prov }}"
-                            data-fecha="{{ $fecha }}"
-                            data-estado="{{ $estado }}"
-                            {{ old('inundacion_id') == $inundacion->id ? 'selected' : '' }}>
-                            #{{ $inundacion->id }} · {{ $fecha }} · {{ $prov }} / {{ $muni }} [{{ $estado }}]
-                        </option>
-                    @endforeach
-                </select>
-                @error('inundacion_id')
-                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-
-                {{-- Tarjeta informativa que se autocompleta al seleccionar inundación --}}
-                <div id="inundacion-info"
-                     class="mt-3 hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <span class="font-semibold block">Fecha</span>
-                            <span id="info-fecha">—</span>
-                        </div>
-                        <div>
-                            <span class="font-semibold block">Provincia</span>
-                            <span id="info-provincia">—</span>
-                        </div>
-                        <div>
-                            <span class="font-semibold block">Municipio</span>
-                            <span id="info-municipio">—</span>
-                        </div>
-                    </div>
-                </div>
+                @include('victimas._flood_picker', [
+                    'inundaciones' => $inundaciones,
+                    'selectedId'   => old('inundacion_id'),
+                ])
             </div>
         </div>
+
 
         {{-- ── Datos Personales ────────────────────────────────────────────── --}}
         <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -247,29 +208,6 @@
 <script>
 (function () {
     'use strict';
-
-    // ── Autocomplete de la tarjeta informativa al elegir inundación ──────
-    const selInun    = document.getElementById('inundacion_id');
-    const infoCard   = document.getElementById('inundacion-info');
-    const infoFecha  = document.getElementById('info-fecha');
-    const infoProv   = document.getElementById('info-provincia');
-    const infoMuni   = document.getElementById('info-municipio');
-
-    function actualizarInfoCard() {
-        const opt = selInun.options[selInun.selectedIndex];
-        if (!selInun.value) {
-            infoCard.classList.add('hidden');
-            return;
-        }
-        infoFecha.textContent    = opt.dataset.fecha    || '—';
-        infoProv.textContent     = opt.dataset.provincia || '—';
-        infoMuni.textContent     = opt.dataset.municipio || '—';
-        infoCard.classList.remove('hidden');
-    }
-
-    selInun.addEventListener('change', actualizarInfoCard);
-    // Si ya hay un valor preseleccionado (old()), mostrar info inmediatamente
-    if (selInun.value) actualizarInfoCard();
 
     // ── Radios de estado: estilos visuales ──────────────────────────────
     const radioLabels = document.querySelectorAll('.estado-radio-label');

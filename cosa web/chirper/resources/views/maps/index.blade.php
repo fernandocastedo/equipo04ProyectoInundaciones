@@ -20,7 +20,8 @@
         </div>
     @endif
 
-    <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative" style="height: 600px;">
+    <div class="relative">
+        <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative z-0" style="height: 600px;">
         <div id="map" class="absolute inset-0 z-0"></div>
         
         <!-- Botón Pantalla Completa -->
@@ -93,10 +94,12 @@
             </div>
             <p class="mt-3 text-[10px] text-gray-400 text-center italic leading-tight">Zonas modeladas con topografía real (OpenTopoMap / SRTM)</p>
         </div>
+        
+        </div>
+        
+        <!-- Panel de Rutas Seguras -->
+        <x-routing-panel />
     </div>
-    
-    <!-- Panel de Rutas Seguras -->
-    <x-routing-panel />
 </div>
 
 <!-- LEAFLET CDN -->

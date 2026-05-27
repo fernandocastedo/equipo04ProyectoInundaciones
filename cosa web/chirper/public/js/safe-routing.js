@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let routeEndMarker = null;
     let routeLayer = null;
     let selectingMode = null; // 'start' o 'end'
+    let currentTransportMode = 'driving-car'; // por defecto auto
 
     const inputStart = document.getElementById('route-start-input');
     const inputEnd = document.getElementById('route-end-input');
@@ -41,6 +42,28 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
             panel.classList.remove('-translate-x-96', 'opacity-0');
         }, 10);
+    });
+
+    // Transport Mode Selection
+    const transportBtns = document.querySelectorAll('.transport-btn');
+    transportBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            // Update active state classes
+            transportBtns.forEach(b => {
+                b.classList.remove('text-emerald-700', 'bg-white', 'shadow-sm');
+                b.classList.add('text-gray-500', 'hover:text-gray-700');
+            });
+            const clicked = e.currentTarget;
+            clicked.classList.remove('text-gray-500', 'hover:text-gray-700');
+            clicked.classList.add('text-emerald-700', 'bg-white', 'shadow-sm');
+            
+            currentTransportMode = clicked.getAttribute('data-mode');
+            
+            // Recalcular automáticamente si los puntos ya están seteados
+            if (!btnCalc.disabled && routeStartMarker && routeEndMarker) {
+                btnCalc.click();
+            }
+        });
     });
 
     // Activar modo de selección al hacer clic en los inputs
@@ -269,7 +292,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-            const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+            const response = await fetch(`https://api.openrouteservice.org/v2/directions/${currentTransportMode}/geojson`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',

@@ -104,6 +104,11 @@
                     <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Logística</span>
                 </a>
                 
+                <a href="{{ route('donaciones.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('donaciones.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Donaciones">
+                    <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Donaciones</span>
+                </a>
+                
                 <a href="{{ route('victimas.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('victimas.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Víctimas">
                     <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Víctimas</span>

@@ -95,4 +95,4 @@ Toda la interfaz del sistema ha sido construida siguiendo estándares **Premium*
 * Animaciones orgánicas (`hover:-translate-y`, `transition-all`) para darle reactividad al ecosistema.
 
 ---
-*Desarrollado para la protección y gestión del riesgo hídrico en la ciudad.*
+*Desarrollado para la protección y gestión del riesgo hídrico en el Departamento de Santa Cruz de la Sierra, Bolivia.*

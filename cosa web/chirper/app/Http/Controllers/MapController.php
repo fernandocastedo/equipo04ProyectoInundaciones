@@ -38,6 +38,7 @@ final class MapController
 
         return view('maps.index', [
             'reports' => (array) Arr::get($result, 'data', []),
+            'ors_key' => config('services.openrouteservice.key'),
             'error' => null,
         ]);
     }

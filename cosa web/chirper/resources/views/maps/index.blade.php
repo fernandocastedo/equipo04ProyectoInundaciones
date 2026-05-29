@@ -20,8 +20,14 @@
         </div>
     @endif
 
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative" style="height: 600px;">
+    <div class="relative">
+        <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative z-0" style="height: 600px;">
         <div id="map" class="absolute inset-0 z-0"></div>
+        
+        <!-- Botón Pantalla Completa -->
+        <button id="btn-fullscreen-map" class="absolute top-[80px] left-[10px] z-[1000] bg-white text-gray-700 p-1.5 rounded-[4px] shadow-[0_1px_5px_rgba(0,0,0,0.65)] hover:bg-gray-100 transition-colors" title="Pantalla Completa" onclick="toggleMapFullscreen()">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+        </button>
         
         <!-- LEYENDA DEL RADAR (UI/UX) -->
         <div id="radar-legend" class="hidden absolute bottom-6 left-6 bg-white/95 backdrop-blur p-4 rounded-xl shadow-xl border border-gray-100 z-[1000] pointer-events-none transition-all duration-300">
@@ -88,6 +94,11 @@
             </div>
             <p class="mt-3 text-[10px] text-gray-400 text-center italic leading-tight">Zonas modeladas con topografía real (OpenTopoMap / SRTM)</p>
         </div>
+        
+        </div>
+        
+        <!-- Panel de Rutas Seguras -->
+        <x-routing-panel />
     </div>
 </div>
 
@@ -96,6 +107,12 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- LEAFLET HEATMAP PLUGIN -->
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<!-- RUTAS SEGURAS -->
+<script>
+    window.ORS_API_KEY = "{{ $ors_key ?? '' }}";
+</script>
+<script src="{{ asset('js/safe-routing.js') }}"></script>
 
 <style>
 /* ── Animación de pulso para zonas de alta intensidad ────────────────── */
@@ -608,6 +625,32 @@ function initMap() {
             map.setView([-17.783325, -63.182111], 12);
         }
     });
+}
+
+// Lógica de Pantalla Completa
+function toggleMapFullscreen() {
+    const container = document.getElementById('map-container');
+    if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+        if (container.requestFullscreen) {
+            container.requestFullscreen();
+        } else if (container.msRequestFullscreen) {
+            container.msRequestFullscreen();
+        } else if (container.mozRequestFullScreen) {
+            container.mozRequestFullScreen();
+        } else if (container.webkitRequestFullscreen) {
+            container.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+        }
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+    }
 }
 
 document.addEventListener("DOMContentLoaded", initMap);

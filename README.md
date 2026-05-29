@@ -9,7 +9,7 @@
 
 El **Sistema de Gestión de Inundaciones (SGI)** es una plataforma web desarrollada para monitorear, validar y visualizar eventos hidrológicos extremos en **Santa Cruz de la Sierra, Bolivia**. 
 
-Santa Cruz presenta un desafío geográfico único: es una ciudad caracterizada por una topografía extremadamente plana (una planicie aluvial), donde el sistema de drenaje natural y los canales concéntricos (los famosos "Anillos") colapsan rápidamente frente a las intensas precipitaciones tropicales. Este sistema aborda el problema combinando la **participación ciudadana (Crowdsourcing)** con **Cálculos Topográficos Inteligentes** para predecir y dibujar cómo el agua se acumula en tiempo real.
+Este sistema aborda el problema combinando la **participación ciudadana (Crowdsourcing)** para predecir y dibujar cómo el agua se acumula en tiempo real.
 
 ---
 
@@ -95,4 +95,4 @@ Toda la interfaz del sistema ha sido construida siguiendo estándares **Premium*
 * Animaciones orgánicas (`hover:-translate-y`, `transition-all`) para darle reactividad al ecosistema.
 
 ---
-*Desarrollado para la protección y gestión del riesgo hídrico en el Departamento de Santa Cruz de la Sierra, Bolivia.*
+*Desarrollado para la protección y gestión del riesgo hídrico en la ciudad.*

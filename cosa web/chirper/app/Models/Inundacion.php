@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Services\GeoLocationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Modelo Inundacion — Quórum Dinámico
@@ -39,11 +41,17 @@ class Inundacion extends Model
         'longitud',
         'estado',
         'municipio_id',
+        'polygon_coords',
+        'polygon_calculado_at',
+        'polygon_editado_autoridad',
     ];
 
     protected $casts = [
-        'latitud'  => 'decimal:7',
-        'longitud' => 'decimal:7',
+        'latitud'                    => 'decimal:7',
+        'longitud'                   => 'decimal:7',
+        'polygon_coords'             => 'array',
+        'polygon_calculado_at'       => 'datetime',
+        'polygon_editado_autoridad'  => 'boolean',
     ];
 
     // ─────────────────────────────────────────────────────────────────────
@@ -89,12 +97,10 @@ class Inundacion extends Model
 
         return $this->reportes()
             ->where(function (Builder $query) use ($ttlInicio, $ahora) {
-                $query->whereBetween('created_at', [$ttlInicio, $ahora])
-                    // Fallback para filas legacy sin created_at.
-                    ->orWhere(function (Builder $fallback) use ($ttlInicio, $ahora) {
-                        $fallback->whereNull('created_at')
-                            ->whereBetween('updated_at', [$ttlInicio, $ahora]);
-                    });
+                // Ahora usamos 'updated_at' para que la autoridad pueda renovar
+                // el tiempo de vida de un reporte haciendo un simple 'touch()'
+                $query->whereBetween('updated_at', [$ttlInicio, $ahora])
+                      ->orWhereBetween('created_at', [$ttlInicio, $ahora]); // Fallback por si acaso
             })
             ->whereNotIn('estado_validacion', [
                 Reporte::VALIDACION_RECHAZADO,
@@ -172,21 +178,57 @@ class Inundacion extends Model
             return;
         }
 
-        $sumaLat = 0;
-        $sumaLng = 0;
+        $sumaLat   = 0.0;
+        $sumaLng   = 0.0;
         $sumaPesos = 0;
 
         foreach ($reportes as $rep) {
-            $peso = $rep->peso ?: 1; // Fallback por seguridad
-            $sumaLat += ((float) $rep->lat_reporte) * $peso;
-            $sumaLng += ((float) $rep->long_reporte) * $peso;
+            $peso       = $rep->peso ?: 1; // Fallback por seguridad
+            $sumaLat   += ((float) $rep->lat_reporte) * $peso;
+            $sumaLng   += ((float) $rep->long_reporte) * $peso;
             $sumaPesos += $peso;
         }
 
         if ($sumaPesos > 0) {
-            $this->latitud = $sumaLat / $sumaPesos;
+            $this->latitud  = $sumaLat / $sumaPesos;
             $this->longitud = $sumaLng / $sumaPesos;
             $this->save();
+
+            // Resolver municipio automáticamente después de actualizar el centroide
+            $this->resolverMunicipio();
+        }
+    }
+
+    /**
+     * Resuelve y persiste el municipio_id usando point-in-polygon sobre
+     * el centroide actual (latitud, longitud) de la inundación.
+     *
+     * Se delega en GeoLocationService para mantener Single Responsibility.
+     * Si el centroide cae fuera de todos los polígonos, municipio_id queda null
+     * y se registra un aviso en el log para revisión manual.
+     */
+    public function resolverMunicipio(): void
+    {
+        $lat = (float) $this->latitud;
+        $lng = (float) $this->longitud;
+
+        if ($lat === 0.0 && $lng === 0.0) {
+            return; // Coordenadas no inicializadas
+        }
+
+        /** @var GeoLocationService $geoService */
+        $geoService = app(GeoLocationService::class);
+        $municipio  = $geoService->findMunicipio($lat, $lng);
+
+        if ($municipio === null) {
+            Log::info("Inundacion #{$this->id}: no se pudo resolver municipio para ({$lat}, {$lng}).");
+            return;
+        }
+
+        if ((int) $this->municipio_id !== $municipio->id) {
+            $this->municipio_id = $municipio->id;
+            $this->saveQuietly(); // sin disparar eventos adicionales
+            Log::info("Inundacion #{$this->id}: municipio asignado → {$municipio->nombre} (id={$municipio->id}).");
         }
     }
 

@@ -40,4 +40,8 @@ return [
         'timeout' => (int) env('FLOOD_API_TIMEOUT', 10),
     ],
 
+    'openrouteservice' => [
+        'key' => env('OPEN_ROUTE_SERVICE_KEY'),
+    ],
+
 ];

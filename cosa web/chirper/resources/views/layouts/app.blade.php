@@ -207,6 +207,7 @@
             </div>
         @endif
 
+        {{ $slot ?? '' }}
         @yield('content')
         </main>
     </div>{{-- /content wrapper --}}

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreInundacionRequest;
 use App\Http\Requests\Api\UpdateInundacionRequest;
 use App\Http\Resources\InundacionResource;
+use App\Jobs\CalcularPoligonoInundacion;
 use App\Models\Inundacion;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -87,6 +88,10 @@ class InundacionController extends Controller
                 'estado_validacion' => \App\Models\Reporte::VALIDACION_ACEPTADO,
             ]);
         }
+
+        // Disparar Job en background para calcular el polígono de inundación
+        // basado en datos topográficos de Open Topo Data.
+        CalcularPoligonoInundacion::dispatch($inundacion->id);
 
         return response()->json([
             'data' => new InundacionResource($inundacion),

@@ -1,6 +1,4 @@
-@extends('layouts.app')
-
-@section('content')
+<div>
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -161,13 +159,10 @@
                                     
                                     <div class="flex items-center gap-3">
                                         @if(isset($role) && $role === 'authority' && $estado === 'activa')
-                                            <form method="POST" action="{{ route('reports.desactivar', ['id' => $id], false) }}"
-                                                  onsubmit="return confirm('¿Desactivar la inundación #{{ $id }}? Pasará a estado Terminada.')" onclick="event.stopPropagation()">
-                                                @csrf
-                                                <button type="submit" class="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors shadow-sm" title="Finalizar Inundación">
-                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
-                                                </button>
-                                            </form>
+                                            <button wire:click="desactivar({{ $id }})" wire:confirm="¿Desactivar la inundación #{{ $id }}? Pasará a estado Terminada." class="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors shadow-sm" title="Finalizar Inundación" onclick="event.stopPropagation()">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                                                <span wire:loading wire:target="desactivar({{ $id }})" class="absolute ml-2 text-xs">...</span>
+                                            </button>
                                         @endif
                                         <div class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400">
                                             <svg id="chevron-{{ $id }}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -202,12 +197,9 @@
                                                         
                                                         {{-- Botón de Renovación para Autoridades --}}
                                                         @if(isset($role) && $role === 'authority')
-                                                            <form method="POST" action="{{ route('reports.renovar', ['id' => $rep['id']], false) }}" class="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                @csrf
-                                                                <button type="submit" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded-lg shadow-sm border border-indigo-100 transition-colors" title="Renovar TTL (+3h)">
-                                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                                                </button>
-                                                            </form>
+                                                            <button wire:click="renovarReporte({{ $rep['id'] }})" class="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded-lg shadow-sm border border-indigo-100" title="Renovar TTL (+3h)">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                                            </button>
                                                         @endif
                                                     </div>
                                                 @endforeach
@@ -238,12 +230,9 @@
                                                         
                                                         {{-- Botón de Renovación para Autoridades --}}
                                                         @if(isset($role) && $role === 'authority')
-                                                            <form method="POST" action="{{ route('reports.renovar', ['id' => $rep['id']], false) }}" class="opacity-100 transition-opacity">
-                                                                @csrf
-                                                                <button type="submit" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded-lg shadow-sm border border-indigo-100 transition-colors" title="Renovar TTL (+3h) para reactivarlo">
-                                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                                                </button>
-                                                            </form>
+                                                            <button wire:click="renovarReporte({{ $rep['id'] }})" class="opacity-100 transition-opacity bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded-lg shadow-sm border border-indigo-100" title="Renovar TTL (+3h) para reactivarlo">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                                            </button>
                                                         @endif
                                                     </div>
                                                 @endforeach
@@ -324,8 +313,8 @@
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         @forelse ($reportesPendientes ?? [] as $rep)
                             <div class="bg-white/50 border border-white/80 rounded-2xl overflow-hidden shadow-sm glass-panel-hover transition-all flex flex-col h-full">
-                                <div class="relative h-48 bg-slate-200" id="minimap-{{ $rep->id }}">
-                                    <!-- Minimap Leaflet -->
+                                <div class="relative h-48 bg-slate-200 z-0" wire:ignore
+                                     x-data="minimapComponent({{ $rep->lat_gps ?? 0 }}, {{ $rep->long_gps ?? 0 }}, {{ $rep->lat_reporte ?? 0 }}, {{ $rep->long_reporte ?? 0 }})">
                                 </div>
                                 <div class="p-5 flex flex-col flex-grow">
                                     <div class="flex justify-between items-start mb-3">
@@ -425,29 +414,29 @@
                                 <div><span class="block text-[10px] font-bold text-slate-400 uppercase">Rechazado</span><span class="font-medium">{{ $rep->updated_at->format('d/m/Y H:i') }}</span></div>
                                 
                                 <div class="col-span-full mt-2 pt-4 border-t border-white/40">
-                                    <form method="POST" action="{{ route('reports.rechazados.estado_validacion.update', ['id' => $rep->id], false) }}" class="flex flex-wrap items-end gap-3">
-                                        @csrf
+                                    <form wire:submit.prevent="updateEstadoValidacion({{ $rep->id }})" class="flex flex-wrap items-end gap-3">
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Estado</label>
-                                            <select name="estado_validacion" class="text-xs font-medium border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-indigo-500">
+                                            <select wire:model="estadoValidacionUpdates.{{ $rep->id }}" class="text-xs font-medium border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-indigo-500">
                                                 <option value="pendiente">Pendiente</option>
                                                 <option value="aceptado">Aceptado</option>
-                                                <option value="rechazado" selected>Rechazado</option>
+                                                <option value="rechazado">Rechazado</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vincular a Inundación (Si Aceptado)</label>
-                                            <select name="inundacion_id" class="text-xs font-medium border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-indigo-500">
+                                            <select wire:model="inundacionVincularIds.{{ $rep->id }}" class="text-xs font-medium border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-indigo-500">
                                                 <option value="">Ninguna</option>
                                                 @foreach(($inundacionesActivasParaVincular ?? []) as $inundacionActiva)
-                                                    <option value="{{ $inundacionActiva->id }}" {{ (int) ($rep->inundacion_id ?? 0) === (int) $inundacionActiva->id ? 'selected' : '' }}>
+                                                    <option value="{{ $inundacionActiva->id }}">
                                                         Inundación #{{ $inundacionActiva->id }}
                                                     </option>
                                                 @endforeach
                                             </select>
                                         </div>
                                         <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-colors">
-                                            Guardar Cambios
+                                            <span wire:loading.remove wire:target="updateEstadoValidacion({{ $rep->id }})">Guardar Cambios</span>
+                                            <span wire:loading wire:target="updateEstadoValidacion({{ $rep->id }})">Guardando...</span>
                                         </button>
                                     </form>
                                 </div>
@@ -531,6 +520,46 @@
     </div> <!-- /min-h-screen -->
 
     <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('minimapComponent', (latGps, lngGps, latRep, lngRep) => ({
+                map: null,
+                init() {
+                    const lGps = parseFloat(latGps);
+                    const lnGps = parseFloat(lngGps);
+                    const lRep = parseFloat(latRep);
+                    const lnRep = parseFloat(lngRep);
+                    
+                    setTimeout(() => {
+                        this.map = L.map(this.$el, {
+                            zoomControl: true, attributionControl: false, dragging: true, scrollWheelZoom: true, doubleClickZoom: true
+                        }).setView([lRep, lnRep], 15);
+                        
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
+                        
+                        const iconGps = L.divIcon({ className: '', html: '<div style=\'background-color: rgba(245,158,11,0.6); width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(245,158,11,0.9); box-shadow: 0 0 8px rgba(0,0,0,0.4);\'></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+                        L.marker([lGps, lnGps], { icon: iconGps })
+                            .bindTooltip("Ubicacion del usuario (GPS)", { direction: 'top' })
+                            .bindPopup("<div class='text-xs'><b>GPS del Ciudadano</b><br>Desde aquí se tomó la foto o se envió el reporte.</div>")
+                            .addTo(this.map);
+                            
+                        L.circle([lGps, lnGps], { radius: 500, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.1, weight: 1.5, dashArray: '4 4' }).addTo(this.map);
+                        
+                        const iconRep = L.divIcon({ className: '', html: '<div style=\'background-color: #EF4444; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.8);\'></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
+                        L.marker([lRep, lnRep], { icon: iconRep })
+                            .bindTooltip("Punto Reportado", { direction: 'top', className: 'font-bold text-rose-600' })
+                            .bindPopup("<div class='text-xs text-rose-700'><b>Punto Reportado</b><br>Lugar exacto del reporte.</div>")
+                            .addTo(this.map);
+                    }, 50);
+                    
+                    this.$cleanup(() => {
+                        if (this.map) {
+                            this.map.remove();
+                        }
+                    });
+                }
+            }));
+        });
+
         function toggleDetails(id) {
             const el = document.getElementById('details-' + id);
             const icon = document.getElementById('chevron-' + id);
@@ -564,68 +593,14 @@
             .then(res => res.json())
             .then(data => {
                 alert(data.message);
-                location.reload();
+                Livewire.dispatch('refreshReports');
             })
             .catch(() => {
                 alert('Ocurrió un error al procesar la solicitud.');
             });
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            @if(isset($role) && $role === 'authority' && count($reportesPendientes ?? []) > 0)
-                const pendingReports = @json($reportesPendientes);
 
-                pendingReports.forEach(rep => {
-                    // Punto 1: Ubicación GPS del usuario (origen)
-                    const latGps  = parseFloat(rep.lat_gps);
-                    const lngGps  = parseFloat(rep.long_gps);
-                    // Punto 2: Ubicación del reporte marcado por el usuario
-                    const latRep  = parseFloat(rep.lat_reporte);
-                    const lngRep  = parseFloat(rep.long_reporte);
-                    const mapId   = 'minimap-' + rep.id;
-
-                    if (!document.getElementById(mapId)) return;
-
-                    // Centrar en el punto del REPORTE (punto 2)
-                    const map = L.map(mapId, {
-                        zoomControl: true,
-                        attributionControl: false,
-                        dragging: true,
-                        scrollWheelZoom: true,
-                        doubleClickZoom: true
-                    }).setView([latRep, lngRep], 15);
-
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-                    // ── Punto 1: GPS del usuario — ámbar semitransparente ──
-                    const iconGps = L.divIcon({
-                        className: '',
-                        html: '<div style="background-color: rgba(245,158,11,0.6); width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(245,158,11,0.9); box-shadow: 0 0 8px rgba(0,0,0,0.4);"></div>',
-                        iconSize: [14, 14], iconAnchor: [7, 7]
-                    });
-                    L.marker([latGps, lngGps], { icon: iconGps })
-                        .bindTooltip("Ubicacion del usuario (GPS)", { direction: 'top' })
-                        .bindPopup("<div class='text-xs'><b>GPS del Ciudadano</b><br>Desde aquí se tomó la foto o se envió el reporte.</div>")
-                        .addTo(map);
-
-                    // ── Radio 500 m alrededor del GPS — círculo azul ──
-                    L.circle([latGps, lngGps], {
-                        radius: 500, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.1, weight: 1.5, dashArray: '4 4'
-                    }).addTo(map);
-
-                    // ── Punto 2: Ubicación del reporte — rojo intenso ──
-                    const iconRep = L.divIcon({
-                        className: '',
-                        html: '<div style="background-color: #EF4444; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.8);"></div>',
-                        iconSize: [18, 18], iconAnchor: [9, 9]
-                    });
-                    L.marker([latRep, lngRep], { icon: iconRep })
-                        .bindTooltip("Punto Reportado", { direction: 'top', className: 'font-bold text-rose-600' })
-                        .bindPopup("<div class='text-xs text-rose-700'><b>Punto Reportado</b><br>Lugar exacto del reporte.</div>")
-                        .addTo(map);
-                });
-            @endif
-        });
 
         function openImageModal(src) {
             const modal = document.getElementById('imageModal');
@@ -654,4 +629,4 @@
             <img id="modalImage" src="" alt="Report Image" class="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20">
         </div>
     </div>
-@endsection
+</div>

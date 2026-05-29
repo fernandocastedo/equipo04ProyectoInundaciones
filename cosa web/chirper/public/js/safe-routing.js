@@ -232,33 +232,96 @@ document.addEventListener('DOMContentLoaded', function () {
         return [poly]; // MultiPolygon requiere anillos anidados
     }
 
-    function getAvoidPolygons() {
-        const polygons = [];
+    function getAllHazardPoints() {
+        const points = [];
         const allReports = (window.floodReports || []).concat(window.pendingReports || []);
         
         allReports.forEach(report => {
             const lat = parseFloat(report.latitud || report.lat_reporte);
             const lng = parseFloat(report.longitud || report.long_reporte);
-            if (isNaN(lat) || isNaN(lng)) return;
-
-            if (report.polygon_coords && Array.isArray(report.polygon_coords) && report.polygon_coords.length > 2) {
-                // El backend guarda [[lat, lng], [lat, lng]]
-                // ORS requiere [[lng, lat], [lng, lat]]
-                const ring = report.polygon_coords.map(coord => [parseFloat(coord[1]), parseFloat(coord[0])]);
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+                // Radios precisos (en metros) ajustados al ancho real de calles e intersecciones
+                let radius = 15; 
+                let intensidad = report.intensidad_calculada || report.intensidad_propuesta;
+                if (intensidad === 'alta') radius = 35;
+                else if (intensidad === 'media') radius = 25;
                 
-                // Asegurar que el polígono esté cerrado (primer y último punto idénticos)
+                points.push({
+                    lat, lng, radius,
+                    polygon_coords: report.polygon_coords || null
+                });
+            }
+
+            // Reportes atómicos individuales
+            if (report.reportes_activos && Array.isArray(report.reportes_activos)) {
+                report.reportes_activos.forEach(rep => {
+                    const rLat = parseFloat(rep.lat_reporte);
+                    const rLng = parseFloat(rep.long_reporte);
+                    if (!isNaN(rLat) && !isNaN(rLng)) {
+                        let rRadius = 15;
+                        if (rep.intensidad_propuesta === 'alta') rRadius = 35;
+                        else if (rep.intensidad_propuesta === 'media') rRadius = 25;
+                        
+                        points.push({
+                            lat: rLat, lng: rLng, radius: rRadius,
+                            polygon_coords: rep.polygon_coords || null
+                        });
+                    }
+                });
+
+                // Puentes térmicos (como en el heatmap)
+                let activeReps = report.reportes_activos;
+                if (activeReps.length > 1) {
+                    for (let i = 0; i < activeReps.length; i++) {
+                        for (let j = i + 1; j < activeReps.length; j++) {
+                            const r1Lat = parseFloat(activeReps[i].lat_reporte);
+                            const r1Lng = parseFloat(activeReps[i].long_reporte);
+                            const r2Lat = parseFloat(activeReps[j].lat_reporte);
+                            const r2Lng = parseFloat(activeReps[j].long_reporte);
+                            
+                            if (isNaN(r1Lat) || isNaN(r1Lng) || isNaN(r2Lat) || isNaN(r2Lng)) continue;
+
+                            const latToMeters = 111320;
+                            const lngToMeters = 111320 * Math.cos(r1Lat * Math.PI / 180);
+                            const dx = (r2Lng - r1Lng) * lngToMeters;
+                            const dy = (r2Lat - r1Lat) * latToMeters;
+                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            
+                            // Limitar conexiones a 250m para coincidir EXACTAMENTE con index.blade.php
+                            if (dist > 10 && dist <= 250) {
+                                let steps = Math.floor(dist / 15); // Un punto cada 15m para crear un muro sólido
+                                if (steps < 2) steps = 2; // Forzar al menos un punto intermedio si están cerca
+                                for (let k = 1; k < steps; k++) {
+                                    let fraction = k / steps;
+                                    points.push({
+                                        lat: r1Lat + (r2Lat - r1Lat) * fraction,
+                                        lng: r1Lng + (r2Lng - r1Lng) * fraction,
+                                        radius: 15, // radio estándar para sellar la calle
+                                        polygon_coords: null
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        return points;
+    }
+
+    function getAvoidPolygons(hazards) {
+        const polygons = [];
+        
+        hazards.forEach(hazard => {
+            if (hazard.polygon_coords && Array.isArray(hazard.polygon_coords) && hazard.polygon_coords.length > 2) {
+                const ring = hazard.polygon_coords.map(coord => [parseFloat(coord[1]), parseFloat(coord[0])]);
                 if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
                     ring.push([...ring[0]]);
                 }
                 polygons.push([ring]);
             } else {
-                // Radio dinámico según intensidad
-                let radius = 100; // baja o null
-                let intensidad = report.intensidad_calculada || report.intensidad_propuesta;
-                if (intensidad === 'alta') radius = 300;
-                else if (intensidad === 'media') radius = 150;
-                
-                polygons.push(createCirclePolygon(lat, lng, radius));
+                polygons.push(createCirclePolygon(hazard.lat, hazard.lng, hazard.radius));
             }
         });
 
@@ -273,25 +336,119 @@ document.addEventListener('DOMContentLoaded', function () {
         loadingDiv.classList.add('flex');
         btnCalc.disabled = true;
 
-        const startCoords = [routeStartMarker.getLatLng().lng, routeStartMarker.getLatLng().lat];
-        const endCoords = [routeEndMarker.getLatLng().lng, routeEndMarker.getLatLng().lat];
-        const avoidPolys = getAvoidPolygons();
+        const startLat = routeStartMarker.getLatLng().lat;
+        const startLng = routeStartMarker.getLatLng().lng;
+        const endLat = routeEndMarker.getLatLng().lat;
+        const endLng = routeEndMarker.getLatLng().lng;
 
-        const requestBody = {
-            coordinates: [startCoords, endCoords],
-            radiuses: [-1, -1]
-        };
+        // 3. Crear el cuerpo de la petición (Coordinates and Options)
+        let coordinatesArray = [
+            [startLng, startLat],
+            [endLng, endLat]
+        ];
 
-        if (avoidPolys.length > 0) {
-            requestBody.options = {
-                avoid_polygons: {
-                    type: "MultiPolygon",
-                    coordinates: avoidPolys
+        const allHazards = getAllHazardPoints();
+
+        // ── LÓGICA INTELIGENTE DE WAYPOINTS (Sólo Peatones y Bicis) ──
+        // Los autos tienen grafos robustos y esquivan polígonos naturalmente. 
+        // Forzar un waypoint a un auto suele meterlo en sentido contrario o calles sin salida.
+        if (currentTransportMode !== 'driving-car' && allHazards.length > 0) {
+            const latToMeters = 111320;
+            const lngToMeters = 111320 * Math.cos(startLat * Math.PI / 180);
+
+            const sx = 0, sy = 0;
+            const ex = (endLng - startLng) * lngToMeters;
+            const ey = (endLat - startLat) * latToMeters;
+            const routeLength = Math.sqrt(ex*ex + ey*ey);
+
+            if (routeLength > 0) {
+                let worstFlood = null;
+                let maxInterference = 0;
+
+                allHazards.forEach(hazard => {
+                    const fx = (hazard.lng - startLng) * lngToMeters;
+                    const fy = (hazard.lat - startLat) * latToMeters;
+                    
+                    const dot = (fx * ex + fy * ey) / routeLength;
+                    if (dot > 0 && dot < routeLength) {
+                        const projX = (dot / routeLength) * ex;
+                        const projY = (dot / routeLength) * ey;
+                        const distToLine = Math.sqrt((fx - projX)**2 + (fy - projY)**2);
+
+                        if (distToLine < hazard.radius) {
+                            const interference = hazard.radius - distToLine;
+                            if (interference > maxInterference) {
+                                maxInterference = interference;
+                                worstFlood = { fx, fy, radius: hazard.radius, projX, projY };
+                            }
+                        }
+                    }
+                });
+
+                if (worstFlood) {
+                    let dirX = worstFlood.fx - worstFlood.projX;
+                    let dirY = worstFlood.fy - worstFlood.projY;
+                    let dirLen = Math.sqrt(dirX*dirX + dirY*dirY);
+                    
+                    if (dirLen < 1) { 
+                        dirX = -ey / routeLength; 
+                        dirY = ex / routeLength; 
+                        dirLen = 1;
+                    }
+                    
+                    let basePush = worstFlood.radius * 1.5;
+                    let pushDist = Math.max(basePush, 100); // Mínimo 100m de empuje para salir de la zona afectada
+                    let waypointLng, waypointLat;
+                    let validWaypoint = false;
+
+                    // Empujar el waypoint hacia afuera hasta que esté libre de TODOS los hazards
+                    for (let attempt = 0; attempt < 8; attempt++) {
+                        const waypointX = worstFlood.fx + (dirX / dirLen) * pushDist;
+                        const waypointY = worstFlood.fy + (dirY / dirLen) * pushDist;
+
+                        waypointLng = startLng + (waypointX / lngToMeters);
+                        waypointLat = startLat + (waypointY / latToMeters);
+
+                        // Verificar colisión con todos los otros hazards
+                        let inHazard = false;
+                        for (let h of allHazards) {
+                            const hx = (h.lng - startLng) * lngToMeters;
+                            const hy = (h.lat - startLat) * latToMeters;
+                            const dist = Math.sqrt((waypointX - hx)**2 + (waypointY - hy)**2);
+                            if (dist <= h.radius) {
+                                inHazard = true;
+                                break;
+                            }
+                        }
+
+                        if (!inHazard) {
+                            validWaypoint = true;
+                            break;
+                        }
+                        pushDist += 50; // empujar 50 metros más afuera si cayó en otro charco
+                    }
+
+                    if (validWaypoint) {
+                        coordinatesArray.splice(1, 0, [waypointLng, waypointLat]);
+                    }
                 }
-            };
+            }
         }
 
-        try {
+        const avoidPolys = getAvoidPolygons(allHazards);
+
+        async function fetchRoute(coords, polys) {
+            let body = { coordinates: coords, elevation: false, instructions: false, units: 'm' };
+            
+            // Si insertamos un waypoint en medio, le damos alta tolerancia de snapping (1000m) 
+            // para que ORS no falle si cae en medio de una cuadra sin calles.
+            if (coords.length === 3) {
+                body.radiuses = [-1, 1000, -1];
+            }
+
+            if (polys && polys.length > 0) {
+                body.options = { avoid_polygons: { type: "MultiPolygon", coordinates: polys } };
+            }
             const response = await fetch(`https://api.openrouteservice.org/v2/directions/${currentTransportMode}/geojson`, {
                 method: 'POST',
                 headers: {
@@ -299,13 +456,31 @@ document.addEventListener('DOMContentLoaded', function () {
                     'Content-Type': 'application/json',
                     'Authorization': window.ORS_API_KEY
                 },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(body)
             });
-
             const data = await response.json();
+            if (!response.ok) throw new Error(data.error ? data.error.message : 'Error calculando ruta');
+            return data;
+        }
 
-            if (!response.ok) {
-                throw new Error(data.error ? data.error.message : 'Error calculando ruta');
+        try {
+            let data;
+            const originalCoords = [ [startLng, startLat], [endLng, endLat] ];
+
+            try {
+                // Intento 1: Con Waypoints Inteligentes y Polígonos de Evasión
+                data = await fetchRoute(coordinatesArray, avoidPolys);
+            } catch (err1) {
+                console.warn("Intento 1 (Ruta Evasiva Óptima) falló:", err1.message);
+                try {
+                    // Intento 2: Sin Waypoints artificiales, pero manteniendo Polígonos
+                    data = await fetchRoute(originalCoords, avoidPolys);
+                } catch (err2) {
+                    console.warn("Intento 2 (Evasión Directa) falló:", err2.message);
+                    // Intento 3: Fallback extremo, sin evasión de inundaciones (Ruta Directa)
+                    data = await fetchRoute(originalCoords, null);
+                    alert("⚠️ No fue posible trazar una ruta 100% segura para este transporte que esquive la inundación por completo. Se muestra la ruta directa, TENGA EXTREMA PRECAUCIÓN AL CRUZAR.");
+                }
             }
 
             if (routeLayer) window.mapObj.removeLayer(routeLayer);

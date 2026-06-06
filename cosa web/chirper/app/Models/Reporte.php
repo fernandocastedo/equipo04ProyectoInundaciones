@@ -60,6 +60,19 @@ class Reporte extends Model
         return $this->belongsTo(User::class, foreignKey: 'citizen_carnet', ownerKey: 'carnet');
     }
 
+    protected static function booted(): void
+    {
+        $clearCache = function (Reporte $reporte) {
+            if ($reporte->inundacion_id !== null) {
+                \Illuminate\Support\Facades\Cache::forget("inundacion.{$reporte->inundacion_id}.quorum");
+                \Illuminate\Support\Facades\Cache::forget("inundacion.{$reporte->inundacion_id}.intensidad_reportes");
+            }
+        };
+
+        static::saved($clearCache);
+        static::deleted($clearCache);
+    }
+
     /**
      * Calcula el peso que debe tener este reporte según si incluye foto.
      */

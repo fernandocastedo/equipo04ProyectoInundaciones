@@ -120,7 +120,9 @@ class Inundacion extends Model
             return (int) $this->reportesActivosTTL->sum('peso');
         }
 
-        return (int) $this->reportesActivosTTL()->sum('peso');
+        return (int) \Illuminate\Support\Facades\Cache::remember("inundacion.{$this->id}.quorum", now()->addMinutes(5), function () {
+            return (int) $this->reportesActivosTTL()->sum('peso');
+        });
     }
 
     /**
@@ -139,9 +141,13 @@ class Inundacion extends Model
      */
     public function intensidadCalculada(): ?string
     {
-        $reportes = $this->relationLoaded('reportesActivosTTL')
-            ? $this->reportesActivosTTL
-            : $this->reportesActivosTTL()->get();
+        if ($this->relationLoaded('reportesActivosTTL')) {
+            $reportes = $this->reportesActivosTTL;
+        } else {
+            $reportes = \Illuminate\Support\Facades\Cache::remember("inundacion.{$this->id}.intensidad_reportes", now()->addMinutes(5), function () {
+                return $this->reportesActivosTTL()->get();
+            });
+        }
 
         if ($reportes->isEmpty()) {
             return null;

@@ -5,6 +5,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\LogisticsController;
+use App\Http\Controllers\VehiculoController;
 use App\Http\Controllers\VictimaController;
 use App\Http\Middleware\ApiAuthenticate;
 use App\Http\Middleware\EnsureApiAuthority;
@@ -57,6 +58,10 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
     // ── Logística (Centros de Asistencia) ────────────────────────────────
     Route::get('/logistica', [LogisticsController::class, 'index'])->name('logistica.index');
 
+    // ── Módulo de Vehículos (Vistas de Mapa y Activos) ────────────────────
+    Route::get('/vehiculos/mapa', [VehiculoController::class, 'mapa'])->name('vehiculos.mapa');
+    Route::get('/vehiculos/activos', [VehiculoController::class, 'activos'])->name('vehiculos.activos');
+
     // ── Módulo de Víctimas ────────────────────────────────────────────────
     // Las rutas GET con segmentos estáticos deben ir ANTES de la ruta con {id}
     Route::get('/victimas', [VictimaController::class, 'index'])->name('victimas.index');
@@ -69,6 +74,10 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::post('/logistica', [LogisticsController::class, 'store'])->name('logistica.store');
         Route::patch('/logistica/{id}', [LogisticsController::class, 'update'])->name('logistica.update');
         Route::delete('/logistica/{id}', [LogisticsController::class, 'destroy'])->name('logistica.destroy');
+
+        // Vehículos — Gestión
+        Route::get('/vehiculos', [VehiculoController::class, 'index'])->name('vehiculos.index');
+        Route::post('/vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
 
         // Víctimas — CRUD completo
         Route::post('/victimas', [VictimaController::class, 'store'])->name('victimas.store');

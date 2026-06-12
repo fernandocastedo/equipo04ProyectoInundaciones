@@ -6,7 +6,7 @@
 
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-xl font-semibold tracking-tight">Reporte #{{ $report['id'] ?? '' }}</h1>
+            <h1 class="text-xl font-semibold tracking-tight">Reporte N°{{ $report['id'] ?? '' }}</h1>
             <p class="mt-1 text-sm text-gray-600">Detalle y seguimiento del reporte.</p>
         </div>
         <a href="{{ route('reports.index', [], false) }}" class="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">Volver</a>

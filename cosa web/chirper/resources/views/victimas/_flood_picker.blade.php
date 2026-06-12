@@ -68,7 +68,7 @@
                 <p class="text-xs text-blue-500 font-medium">Inundación seleccionada</p>
                 <p id="fp-chip-label" class="text-sm font-semibold text-blue-800 truncate">
                     @if($selectedInun)
-                        #{{ $selectedInun['id'] }} · {{ $selectedInun['municipio'] }} · {{ $selectedInun['created_at'] }}
+                        N°{{ $selectedInun['id'] }} · {{ $selectedInun['municipio'] }} · {{ $selectedInun['created_at'] }}
                     @endif
                 </p>
             </div>
@@ -120,7 +120,7 @@
             </svg>
             <input type="text" id="fp-search"
                    placeholder="Buscar por ID, municipio o provincia..."
-                   class="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                   class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
         </div>
 
         {{-- Status chips + date range --}}
@@ -145,11 +145,11 @@
             <span class="text-xs text-gray-400 mx-1">|</span>
 
             <input type="date" id="fp-date-from"
-                   class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                   class="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                    placeholder="Desde" title="Desde">
             <span class="text-xs text-gray-400">—</span>
             <input type="date" id="fp-date-to"
-                   class="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                   class="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                    placeholder="Hasta" title="Hasta">
         </div>
     </div>

@@ -94,10 +94,7 @@
                     <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Reportes</span>
                 </a>
                 
-                <a href="{{ route('maps.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('maps.index') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Mapas">
-                    <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
-                    <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Mapas</span>
-                </a>
+
                 
                 <a href="{{ route('vehiculos.mapa', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('vehiculos.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-gray-800 hover:text-white' }}" title="Rastreo de Vehículos">
                     <svg class="w-6 h-6 min-w-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>

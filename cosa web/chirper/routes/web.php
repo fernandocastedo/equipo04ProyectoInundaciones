@@ -5,6 +5,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\LogisticsController;
+use App\Http\Controllers\VehiculoController;
 use App\Http\Controllers\VictimaController;
 use App\Http\Controllers\DonacionController;
 use App\Http\Middleware\ApiAuthenticate;
@@ -58,6 +59,10 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
     // ── Logística (Centros de Asistencia) ────────────────────────────────
     Route::get('/logistica', [LogisticsController::class, 'index'])->name('logistica.index');
 
+    // ── Módulo de Vehículos (Vistas de Mapa y Activos) ────────────────────
+    Route::get('/vehiculos/mapa', [VehiculoController::class, 'mapa'])->name('vehiculos.mapa');
+    Route::get('/vehiculos/activos', [VehiculoController::class, 'activos'])->name('vehiculos.activos');
+
     // ── Módulo de Víctimas ────────────────────────────────────────────────
     // Las rutas GET con segmentos estáticos deben ir ANTES de la ruta con {id}
     Route::get('/victimas', [VictimaController::class, 'index'])->name('victimas.index');
@@ -66,6 +71,9 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
     // ── Módulo de Donaciones ──────────────────────────────────────────────
     Route::get('/donaciones', [DonacionController::class, 'index'])->name('donaciones.index');
+    // ── Centro de Comando (Timeline y Análisis) ───────────────────────────
+    Route::get('/command-center', [\App\Http\Controllers\CommandCenterController::class, 'index'])->name('command-center.index');
+    Route::get('/command-center/data', [\App\Http\Controllers\CommandCenterController::class, 'getData'])->name('command-center.data');
 
     // Operaciones de escritura — solo autoridad
     Route::middleware(EnsureApiAuthority::class)->group(function () {
@@ -74,11 +82,20 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::patch('/logistica/{id}', [LogisticsController::class, 'update'])->name('logistica.update');
         Route::delete('/logistica/{id}', [LogisticsController::class, 'destroy'])->name('logistica.destroy');
 
+        // Vehículos — Gestión
+        Route::get('/vehiculos', [VehiculoController::class, 'index'])->name('vehiculos.index');
+        Route::post('/vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
+
         // Víctimas — CRUD completo
         Route::post('/victimas', [VictimaController::class, 'store'])->name('victimas.store');
         Route::get('/victimas/{id}/edit', [VictimaController::class, 'edit'])->name('victimas.edit')->where('id', '[0-9]+');
         Route::put('/victimas/{id}', [VictimaController::class, 'update'])->name('victimas.update')->where('id', '[0-9]+');
         Route::delete('/victimas/{id}', [VictimaController::class, 'destroy'])->name('victimas.destroy')->where('id', '[0-9]+');
+
+        // Centro de Comando — Operaciones Autoridad
+        Route::post('/command-center/danos', [\App\Http\Controllers\CommandCenterController::class, 'registrarDano'])->name('command-center.danos.store');
+        Route::post('/command-center/merge', [\App\Http\Controllers\CommandCenterController::class, 'mergeInundaciones'])->name('command-center.merge');
+        Route::get('/command-center/merge-recommendations', [\App\Http\Controllers\CommandCenterController::class, 'getMergeRecommendations'])->name('command-center.merge.recommendations');
 
         // ── Chat entre autoridades ────────────────────────────────────────────
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');

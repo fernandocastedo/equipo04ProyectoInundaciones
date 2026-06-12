@@ -55,36 +55,64 @@ El sistema reconoce que el cálculo algorítmico puede no ser suficiente en desa
 
 ---
 
-## 🚀 Guía de Instalación Rápida para Desarrolladores
+## 🚀 Guía de Instalación Rápida para Desarrolladores (Optimizado para WSL/Ubuntu)
 
-El proyecto utiliza **Laravel Sail**, lo que significa que solo necesitas Docker instalado.
+Para maximizar el rendimiento de Docker en Windows, este proyecto se ha configurado para ejecutarse nativamente dentro de **WSL (Ubuntu)**. Sigue estos pasos para levantar el entorno:
 
-1. **Clonar el repositorio y entrar a la carpeta del proyecto.**
-2. **Instalar dependencias de PHP usando un contenedor efímero:**
-   ```bash
-   docker run --rm \
-       -u "$(id -u):$(id -g)" \
-       -v "$(pwd):/var/www/html" \
-       -w /var/www/html \
-       laravelsail/php84-composer:latest \
-       composer install --ignore-platform-reqs
+1. **Instalar WSL (Linux) en Windows:**
+   Abre una terminal de PowerShell como administrador y ejecuta:
+   ```powershell
+   wsl --install
    ```
-3. **Copiar el archivo de entorno y levantar los contenedores:**
+   *(Si ya lo tienes, asegúrate de que esté actualizado con `wsl --update` y reinicia si es necesario).*
+
+2. **Mover o copiar el proyecto a Ubuntu:**
+   Para que Docker funcione a la máxima velocidad, el proyecto **no** debe estar en tu disco de Windows (como `C:\Users\...`). 
+   - Abre tu terminal de Ubuntu y clona o copia tu proyecto dentro del sistema de archivos de Linux (por ejemplo, en `/home/tu_usuario/ProyectoInundaciones2` o `/root/...`).
+
+3. **Instalar dependencias clave en Ubuntu:**
+   Abre tu terminal de Ubuntu y asegúrate de instalar PHP, Composer y Node.js para poder gestionar los paquetes correctamente de forma local antes de levantar Sail:
    ```bash
+   # 1. Actualizar sistema
+   sudo apt update
+
+   # 2. Instalar PHP y extensiones básicas
+   sudo apt install -y php-cli php-curl php-xml php-mbstring unzip
+
+   # 3. Instalar Composer
+   curl -sS https://getcomposer.org/installer -o composer-setup.php
+   sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+   rm composer-setup.php
+
+   # 4. Instalar Node.js y NPM
+   sudo apt install -y nodejs npm
+   ```
+
+4. **Configurar Docker y levantar el sistema (Laravel Sail):**
+   Dentro de Ubuntu, navega a la carpeta principal de tu proyecto web (ej. `cd "cosa web/chirper"`) y ejecuta:
+   ```bash
+   # Instalar dependencias de backend
+   composer install
+
+   # Copiar archivo de entorno
    cp .env.example .env
+
+   # Levantar los contenedores de Docker (Base de Datos, Redis, etc.) en segundo plano
    ./vendor/bin/sail up -d
-   ```
-4. **Generar la clave de la app y correr migraciones (con PostGIS):**
-   ```bash
+
+   # Generar clave de aplicación y correr las migraciones (PostGIS)
    ./vendor/bin/sail artisan key:generate
    ./vendor/bin/sail artisan migrate --seed
    ```
-5. **Compilar los assets del Frontend (Tailwind):**
+
+5. **Correr el programa (Frontend):**
+   Finalmente, instala los paquetes de Node y arranca el servidor de desarrollo:
    ```bash
-   ./vendor/bin/sail npm install
-   ./vendor/bin/sail npm run dev
+   npm install
+   npm run dev
    ```
-6. Ingresa a `http://localhost:8001` (o el puerto configurado) en tu navegador.
+
+6. Ingresa a `http://localhost:8001` (o el puerto configurado en tu `.env`) en tu navegador para ver la plataforma funcionando a máxima velocidad.
 
 ---
 

@@ -68,6 +68,10 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
     Route::get('/victimas/create', [VictimaController::class, 'create'])->name('victimas.create');
     Route::get('/victimas/{id}', [VictimaController::class, 'show'])->name('victimas.show')->where('id', '[0-9]+');
 
+    // ── Centro de Comando (Timeline y Análisis) ───────────────────────────
+    Route::get('/command-center', [\App\Http\Controllers\CommandCenterController::class, 'index'])->name('command-center.index');
+    Route::get('/command-center/data', [\App\Http\Controllers\CommandCenterController::class, 'getData'])->name('command-center.data');
+
     // Operaciones de escritura — solo autoridad
     Route::middleware(EnsureApiAuthority::class)->group(function () {
         // Logística
@@ -84,6 +88,11 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
         Route::get('/victimas/{id}/edit', [VictimaController::class, 'edit'])->name('victimas.edit')->where('id', '[0-9]+');
         Route::put('/victimas/{id}', [VictimaController::class, 'update'])->name('victimas.update')->where('id', '[0-9]+');
         Route::delete('/victimas/{id}', [VictimaController::class, 'destroy'])->name('victimas.destroy')->where('id', '[0-9]+');
+
+        // Centro de Comando — Operaciones Autoridad
+        Route::post('/command-center/danos', [\App\Http\Controllers\CommandCenterController::class, 'registrarDano'])->name('command-center.danos.store');
+        Route::post('/command-center/merge', [\App\Http\Controllers\CommandCenterController::class, 'mergeInundaciones'])->name('command-center.merge');
+        Route::get('/command-center/merge-recommendations', [\App\Http\Controllers\CommandCenterController::class, 'getMergeRecommendations'])->name('command-center.merge.recommendations');
 
         // ── Chat entre autoridades ────────────────────────────────────────────
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');

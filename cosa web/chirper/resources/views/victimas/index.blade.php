@@ -363,6 +363,14 @@
         inputNombre.value   = '';
         filtrar();
     });
+
+    // ── Leer parámetros de la URL ──────────────────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('inundacion_id')) {
+        selInundacion.value = urlParams.get('inundacion_id');
+        // Simular el change event para que se aplique y actualice provincias/municipios
+        selInundacion.dispatchEvent(new Event('change'));
+    }
 })();
 </script>
 @endsection

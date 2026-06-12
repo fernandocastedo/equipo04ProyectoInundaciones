@@ -76,7 +76,7 @@
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased flex">
     @if (session()->has('api_token'))
         <!-- SIDEBAR INTERACTIVO -->
-        <aside class="fixed inset-y-0 left-0 bg-[#0f172a] text-gray-300 w-16 hover:w-64 transition-all duration-300 ease-in-out z-[999] overflow-x-hidden overflow-y-hidden flex flex-col group border-r border-gray-800 shadow-2xl no-scrollbar">
+        <aside class="fixed inset-y-0 left-0 bg-[#0f172a] text-gray-300 w-16 hover:w-64 transition-all duration-300 ease-in-out z-[2000] overflow-x-hidden overflow-y-hidden flex flex-col group border-r border-gray-800 shadow-2xl no-scrollbar">
             <!-- Logo / Brand -->
             <div class="h-16 flex items-center px-4 border-b border-gray-800 shrink-0 bg-[#0b1120]">
                 <div class="min-w-[32px] h-8 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/30">

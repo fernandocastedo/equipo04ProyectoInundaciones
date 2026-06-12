@@ -31,17 +31,16 @@
     </style>
 
     <!-- Main Container with custom gradient background -->
-    <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50/50 to-teal-50/30 -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
+    <div class="min-h-screen bg-gray-100 -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
         
         <div class="max-w-7xl mx-auto">
             
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold tracking-tight gradient-text">Registro de Inundaciones</h1>
-                    <p class="mt-2 text-sm font-medium text-slate-500">Centro de Monitoreo y Validación de Eventos Hidrológicos.</p>
+                    <h1 class="text-3xl font-bold tracking-tight text-blue-800">Registro de Inundaciones</h1>
+                    <p class="mt-2 text-sm font-medium text-slate-600">Centro de Monitoreo y Validación de Eventos Hidrológicos.</p>
                 </div>
-                <a href="{{ route('reports.create', [], false) }}" class="group relative inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2.5 text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden">
-                    <div class="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 ease-out -translate-x-full skew-x-12"></div>
+                <a href="{{ route('reports.create', [], false) }}" class="group relative inline-flex items-center gap-2 rounded bg-blue-700 px-6 py-2.5 text-white font-semibold shadow-md hover:bg-blue-800 transition-colors">
                     <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     <span class="relative z-10">Nuevo Reporte</span>
                 </a>
@@ -54,7 +53,7 @@
     </div>
 
     <div class="relative mb-10">
-        <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative z-0" style="height: 600px;">
+        <div id="map-container" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative z-0" style="height: 600px;" wire:ignore>
             <div id="map" class="absolute inset-0 z-0"></div>
             
             <!-- Botón Pantalla Completa -->
@@ -91,8 +90,7 @@
 
 
             @if (session('error') || !empty($error))
-                <div class="mb-6 rounded-2xl border border-red-200/60 bg-red-50/80 backdrop-blur-sm p-4 text-sm shadow-sm animate-pulse flex items-center gap-3">
-                    <span class="text-red-500 text-xl">⚠️</span>
+                <div class="mb-6 rounded border border-red-300 bg-red-100 p-4 text-sm flex items-center gap-3">
                     <span class="text-red-800 font-medium">{{ session('error') ?? $error ?? '' }}</span>
                 </div>
             @endif
@@ -105,12 +103,12 @@
             @endif
 
             @if(count($misReportes ?? []) > 0 || (isset($role) && $role === 'citizen'))
-                <div class="glass-panel rounded-3xl overflow-hidden mb-10">
-                    <div class="px-6 py-5 border-b border-white/50 flex items-center justify-between bg-white/30">
-                        <h2 class="text-xl font-semibold text-slate-800 flex items-center gap-2">
-                            <span class="text-indigo-500">👤</span> Mis reportes enviados
+                <div class="bg-white rounded border border-gray-200 overflow-hidden mb-10 shadow-sm">
+                    <div class="px-6 py-5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                            Mis reportes enviados
                         </h2>
-                        <span class="bg-indigo-100 text-indigo-700 py-1 px-3 rounded-full text-xs font-bold">{{ count($misReportes ?? []) }} registro(s)</span>
+                        <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded text-xs font-bold">{{ count($misReportes ?? []) }} registro(s)</span>
                     </div>
                     <div class="overflow-x-auto p-2">
                         <table class="w-full text-sm glass-table rounded-xl overflow-hidden">
@@ -125,11 +123,11 @@
                             <tbody class="divide-y divide-slate-200/50">
                                 @forelse(($misReportes ?? []) as $rep)
                                     <tr class="transition-colors duration-200">
-                                        <td class="px-4 py-3 font-semibold text-slate-700">#{{ $rep->id }}</td>
+                                        <td class="px-4 py-3 font-semibold text-slate-700">N°{{ $rep->id }}</td>
                                         <td class="px-4 py-3">
                                             @php($estadoVal = (string) $rep->estado_validacion)
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold shadow-sm
-                                                {{ $estadoVal === 'pendiente' ? 'bg-amber-100 text-amber-700' : ($estadoVal === 'aceptado' ? 'bg-teal-100 text-teal-700' : 'bg-rose-100 text-rose-700') }}">
+                                            <span class="inline-flex items-center rounded px-2.5 py-1 text-xs font-bold
+                                                {{ $estadoVal === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : ($estadoVal === 'aceptado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
                                                 {{ ucfirst($estadoVal) }}
                                             </span>
                                         </td>
@@ -646,6 +644,9 @@ window.pendingReports = [];
 
 
 function initMap() {
+    const mapEl = document.getElementById('map');
+    if (!mapEl || mapEl._leaflet_id) return;
+
     const defaultLocation = [-17.783325, -63.182111]; // Centro de Santa Cruz de la Sierra, Bolivia
 
     let centerLoc = defaultLocation;
@@ -663,6 +664,17 @@ function initMap() {
     // ── 1. Inicializar Mapa ───────────────────────────────────────────────
     const map = L.map('map', { preferCanvas: true }).setView(centerLoc, 12);
     window.mapObj = map;
+
+    // Lógica dinámica para ajustar el radio geográfico de la capa de calor
+    map.on('zoomend', function() {
+        if (window.activeHeatLayer) {
+            let zoom = map.getZoom();
+            // Escala exponencial moderada (1.5x en vez de 2x): Crece lo suficiente para mantener sentido geográfico sin explotar a un círculo sólido.
+            let newRadius = Math.max(12, Math.round(35 * Math.pow(1.5, zoom - 16)));
+            let newBlur = Math.max(10, Math.round(newRadius * 0.8)); // 80% de blur para asegurar opacidad en las esquinas
+            window.activeHeatLayer.setOptions({ radius: newRadius, blur: newBlur });
+        }
+    });
 
     // Bounding box del departamento de Santa Cruz (para limitar capas externas)
     const santaCruzBounds = [[-20.5, -64.8], [-13.5, -57.4]];
@@ -691,7 +703,6 @@ function initMap() {
     const baseMaps = {
         "Mapa Normal (OSM)": osmLayer,
         "Satelital (Esri)": satelliteLayer,
-        "Topográfico (OpenTopoMap)": topoLayer,
     };
 
     // ── 3. Overlays ───────────────────────────────────────────────────────
@@ -778,9 +789,9 @@ function initMap() {
     const radarLegend = document.getElementById('radar-legend');
 
     map.on('overlayadd', function (e) {
-        if (e.name === "🌧️ Radar de Lluvia (OpenWeather)" || e.name === "☁️ Nubes (OpenWeather)") {
+        if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
             if (radarLegend) radarLegend.classList.remove('hidden');
-            const isCloud = e.name === "☁️ Nubes (OpenWeather)";
+            const isCloud = e.name === "Nubes (OpenWeather)";
             document.getElementById('radar-legend-title').innerHTML = isCloud
                 ? '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Densidad de Nubes</span>'
                 : '<svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg><span>Intensidad de Lluvia</span>';
@@ -789,7 +800,7 @@ function initMap() {
         }
     });
     map.on('overlayremove', function (e) {
-        if (e.name === "🌧️ Radar de Lluvia (OpenWeather)" || e.name === "☁️ Nubes (OpenWeather)") {
+        if (e.name === "Radar de Lluvia (OpenWeather)" || e.name === "Nubes (OpenWeather)") {
             if (!map.hasLayer(precipLayer) && !map.hasLayer(cloudLayer)) {
                 if (radarLegend) radarLegend.classList.add('hidden');
             } else if (map.hasLayer(cloudLayer)) {
@@ -840,11 +851,11 @@ function initMap() {
 
             // ── Popups Informativos del Centro de Inundación ─────────────────
             const confirmadoBadge = report.esta_confirmada
-                ? '<span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">✓ Confirmada</span>'
-                : '<span class="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">⏳ En espera</span>';
+                ? '<span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded">Confirmada</span>'
+                : '<span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded">En espera</span>';
 
             const intensidadBadgeColor = { alta: 'blue', media: 'sky', baja: 'teal' }[intensidad] || 'gray';
-            const intensidadBadge = `<span class="inline-flex items-center bg-${intensidadBadgeColor}-100 text-${intensidadBadgeColor}-800 text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize">${intensidad}</span>`;
+            const intensidadBadge = `<span class="inline-flex items-center bg-${intensidadBadgeColor}-100 text-${intensidadBadgeColor}-800 text-[10px] font-semibold px-2 py-0.5 rounded capitalize">${intensidad}</span>`;
 
             const desc        = report.description || 'Sin descripción del evento.';
             const shortDesc   = desc.length > 120 ? desc.substring(0, 120) + '…' : desc;
@@ -856,8 +867,8 @@ function initMap() {
             }
 
             const polygonNote = report.polygon_coords
-                ? `<p class="text-[10px] text-blue-600 mt-1">🌊 Polígono expansivo recalculado (${numReports} reportes asociados)</p>`
-                : '<p class="text-[10px] text-gray-400 mt-1">⏳ Calculando zona de impacto topográfica…</p>';
+                ? `<p class="text-[10px] text-blue-600 mt-1">Polígono expansivo recalculado (${numReports} reportes asociados)</p>`
+                : '<p class="text-[10px] text-gray-500 mt-1">Calculando zona de impacto topográfica…</p>';
 
             const popupContent = `
                 <div class="max-w-[240px] font-sans">
@@ -865,7 +876,7 @@ function initMap() {
                         ${intensidadBadge}
                         ${confirmadoBadge}
                     </div>
-                    <h5 class="text-xs font-bold text-gray-800 mb-1">Evento de Inundación #${report.id}</h5>
+                    <h5 class="text-xs font-bold text-gray-800 mb-1">Evento de Inundación N°${report.id}</h5>
                     <p class="text-xs text-gray-700 mb-1 leading-snug">${shortDesc}</p>
                     <p class="text-xs text-gray-500">${quorumStr}</p>
                     ${polygonNote}
@@ -946,7 +957,7 @@ function initMap() {
                     const repPopupContent = `
                         <div class="max-w-[200px] font-sans text-xs">
                             <div class="flex items-center gap-1.5 mb-1.5">
-                                <span class="bg-gray-100 text-gray-800 text-[9px] font-bold px-1.5 py-0.5 rounded">Reporte #${rep.id}</span>
+                                <span class="bg-gray-200 text-gray-800 text-[9px] font-bold px-1.5 py-0.5 rounded">Reporte N°${rep.id}</span>
                                 ${repIntensityBadge}
                             </div>
                             <p class="text-gray-600 font-medium">Aportó <b>${rep.peso} pts</b> al quórum.</p>
@@ -971,8 +982,8 @@ function initMap() {
                             
                             // Si están a menos de 250 metros, se conectan con manchas (puente de inundación)
                             if (dist > 10 && dist <= 250) {
-                                // 1 punto térmico cada 15 metros para asegurar continuidad sin círculos duros
-                                let steps = Math.floor(dist / 15);
+                                // 1 punto térmico cada 5 metros para asegurar continuidad sin círculos duros
+                                let steps = Math.floor(dist / 5);
                                 for (let k = 1; k < steps; k++) {
                                     let fraction = k / steps;
                                     let interLat = p1.lat + (p2.lat - p1.lat) * fraction;
@@ -994,10 +1005,14 @@ function initMap() {
 
         // ── Creación Final de la Capa de Degradado ──────────────────────────
         if (heatPoints.length > 0) {
+            let initialZoom = map.getZoom();
+            let initialRadius = Math.max(12, Math.round(35 * Math.pow(1.5, initialZoom - 16)));
+            let initialBlur = Math.max(10, Math.round(initialRadius * 0.8));
+
             window.activeHeatLayer = L.heatLayer(heatPoints, {
-                radius: 75,       // Aumentado drásticamente para que se toquen incluso al hacer zoom in
-                blur: 45,         // Suavizado controlado para no perder la solidez
-                minOpacity: 0.4,  // Clave: Esto hace que el "puente" y los bordes sean mucho menos transparentes
+                radius: initialRadius,
+                blur: initialBlur,
+                minOpacity: 0.5,
                 maxZoom: 18,      // Mantener la intensidad correcta en niveles de zoom altos
                 gradient: {
                     0.2: '#38bdf8', // Bordes (Agua somera escurriendo hacia zonas bajas)
@@ -1101,6 +1116,7 @@ function toggleMapFullscreen() {
 }
 
 document.addEventListener("DOMContentLoaded", initMap);
+document.addEventListener("livewire:navigated", initMap);
 </script>
 <script>
 window.renderPendingReports = function(pendingData) {

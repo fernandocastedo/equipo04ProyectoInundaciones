@@ -18,6 +18,9 @@ class Donacion extends Model
         'is_anonymous',
         'status',
         'usage_details',
+        'inundacion_id',
+        'victima_id',
+        'photo_path',
     ];
 
     protected $casts = [
@@ -32,5 +35,15 @@ class Donacion extends Model
     public function donor()
     {
         return $this->belongsTo(User::class, 'donor_carnet', 'carnet');
+    }
+
+    public function inundacion()
+    {
+        return $this->belongsTo(Inundacion::class, 'inundacion_id');
+    }
+
+    public function victima()
+    {
+        return $this->belongsTo(Victima::class, 'victima_id');
     }
 }

@@ -1,4 +1,3 @@
-name: proyectowebactual
 services:
   postgres_db:
     image: postgres:16-alpine
@@ -7,7 +6,7 @@ services:
       POSTGRES_USER: sail
       POSTGRES_PASSWORD: password
     ports:
-      - "5441:5432"
+      - "5440:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -20,24 +19,24 @@ services:
     volumes:
       - "./cosa web/chirper:/var/www/html"
     ports:
-      - "8002:8002"
+      - "8001:8001"
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
-      - APP_URL=http://localhost:8002
+      - APP_URL=http://localhost:8001
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres_db
       - DB_PORT=5432
       - DB_DATABASE=chirper
       - DB_USERNAME=sail
       - DB_PASSWORD=password
-      - FLOOD_API_BASE_URL=http://localhost:8002/api
+      - FLOOD_API_BASE_URL=http://localhost:8001/api
       - FLOOD_API_INTERNAL=false
       - PHP_CLI_SERVER_WORKERS=4
     depends_on:
       - postgres_db
     command: >
-      php artisan serve --host=0.0.0.0 --port=8002
+      php artisan serve --host=0.0.0.0 --port=8001
     networks:
       - app-network
 

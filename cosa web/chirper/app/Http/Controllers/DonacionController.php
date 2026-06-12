@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Donacion;
 use App\Models\CentroAsistencia;
+use App\Models\Inundacion;
+use App\Models\Victima;
 use Illuminate\Http\Request;
 
 class DonacionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Donacion::with(['centro', 'donor'])->latest();
+        $query = Donacion::with(['centro', 'donor', 'inundacion.municipio', 'victima'])->latest();
 
         // Filtro por Centro de Asistencia
         if ($request->filled('centro_id')) {
@@ -33,10 +35,16 @@ class DonacionController extends Controller
 
         $donaciones = $query->paginate(15)->withQueryString();
         $centros = CentroAsistencia::orderBy('nombre')->get(['id_centro', 'nombre']);
+        $inundacionesActivas = Inundacion::activas()->with('municipio')->latest()->get();
+        $inundacionesTerminadas = Inundacion::terminadas()->with('municipio')->latest()->get();
+        $victimas = Victima::all();
 
         return view('donaciones.index', [
             'donaciones' => $donaciones,
             'centros'    => $centros,
+            'inundacionesActivas' => $inundacionesActivas,
+            'inundacionesTerminadas' => $inundacionesTerminadas,
+            'victimas'   => $victimas,
         ]);
     }
 
@@ -44,13 +52,19 @@ class DonacionController extends Controller
     {
         $validated = $request->validate([
             'centro_id'         => 'required|exists:centros_asistencia,id_centro',
-            'donor_carnet'      => 'nullable|string|exists:users,carnet',
+            'donor_carnet'      => 'nullable|string|min:6|max:8|regex:/^[0-9]+$/|exists:users,carnet',
             'items_description' => 'required|string',
             'is_anonymous'      => 'boolean',
+            'inundacion_id'     => 'nullable|exists:inundaciones,id',
+            'victima_id'        => 'nullable|exists:victimas,id',
         ]);
 
+        if (!$request->boolean('is_anonymous') && empty($validated['donor_carnet'])) {
+            return back()->withErrors(['donor_carnet' => 'El carnet del donante es obligatorio si no es anónimo.'])->withInput();
+        }
+
         $validated['is_anonymous'] = $request->boolean('is_anonymous');
-        $validated['status'] = 'recibido'; // Por defecto al registrar
+        $validated['status'] = 'en_inventario';
         
         Donacion::create($validated);
 
@@ -61,10 +75,24 @@ class DonacionController extends Controller
     {
         $donacion = Donacion::findOrFail($id);
 
-        $validated = $request->validate([
-            'status'        => 'required|string|in:recibido,en_uso,entregado',
+        $rules = [
+            'status'        => 'required|string|in:en_inventario,entregado',
             'usage_details' => 'nullable|string',
-        ]);
+            'inundacion_id' => 'required_if:status,entregado|nullable|exists:inundaciones,id',
+            'victima_id'    => 'nullable|exists:victimas,id',
+        ];
+
+        if ($request->status !== $donacion->status) {
+            $rules['photo'] = 'required|image|max:2048';
+        } else {
+            $rules['photo'] = 'nullable|image|max:2048';
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($request->hasFile('photo')) {
+            $validated['photo_path'] = $request->file('photo')->store('donaciones', 'public');
+        }
 
         $donacion->update($validated);
 

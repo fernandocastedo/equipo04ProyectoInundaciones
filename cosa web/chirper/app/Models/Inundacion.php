@@ -81,6 +81,14 @@ class Inundacion extends Model
         return $this->hasMany(Victima::class, 'inundacion_id');
     }
 
+    /**
+     * Daños materiales registrados en esta inundación.
+     */
+    public function danosMateriales(): HasMany
+    {
+        return $this->hasMany(DanoMaterial::class, 'inundacion_id');
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Cómputo dinámico de Quórum
     // ─────────────────────────────────────────────────────────────────────
@@ -141,36 +149,33 @@ class Inundacion extends Model
      */
     public function intensidadCalculada(): ?string
     {
-        if ($this->relationLoaded('reportesActivosTTL')) {
-            $reportes = $this->reportesActivosTTL;
-        } else {
-            $reportes = \Illuminate\Support\Facades\Cache::remember("inundacion.{$this->id}.intensidad_reportes", now()->addMinutes(5), function () {
-                return $this->reportesActivosTTL()->get();
-            });
-        }
-
-        if ($reportes->isEmpty()) {
-            return null;
-        }
-
-        $puntos = [
-            'alta'  => 0,
-            'media' => 0,
-            'baja'  => 0,
-        ];
-
-        foreach ($reportes as $reporte) {
-            $intensidad = $reporte->intensidad_propuesta;
-            if (array_key_exists($intensidad, $puntos)) {
-                $puntos[$intensidad] += $reporte->peso;
+        return \Illuminate\Support\Facades\Cache::remember("inundacion.{$this->id}.intensidad_calculada", now()->addMinutes(5), function () {
+            if ($this->relationLoaded('reportesActivosTTL')) {
+                $reportes = $this->reportesActivosTTL;
+            } else {
+                $reportes = $this->reportesActivosTTL()->get();
             }
-        }
 
-        // En empate, arsort() mantiene el orden alta > media > baja
-        // porque iteramos en ese orden y arsort es estable en PHP ≥ 8.
-        arsort($puntos);
+            if ($reportes->isEmpty()) {
+                return null;
+            }
 
-        return (string) array_key_first($puntos);
+            $puntos = [
+                'alta'  => 0,
+                'media' => 0,
+                'baja'  => 0,
+            ];
+
+            foreach ($reportes as $reporte) {
+                $intensidad = $reporte->intensidad_propuesta;
+                if (array_key_exists($intensidad, $puntos)) {
+                    $puntos[$intensidad] += $reporte->peso;
+                }
+            }
+
+            arsort($puntos);
+            return array_key_first($puntos);
+        });
     }
 
     /**

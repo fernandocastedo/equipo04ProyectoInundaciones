@@ -34,4 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('centros', [CentroAsistenciaController::class, 'store']);
     Route::patch('centros/{centro_id}', [CentroAsistenciaController::class, 'update']);
     Route::delete('centros/{centro_id}', [CentroAsistenciaController::class, 'destroy']);
+
+    // Rastreo de Vehículos (App Móvil)
+    Route::post('tracking/ping', [\App\Http\Controllers\Api\VehicleTrackingController::class, 'ping']);
 });

@@ -116,12 +116,12 @@
                     <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Víctimas</span>
                 </a>
                 
-                @if ($apiRole === 'authority')
+                {{-- @if ($apiRole === 'authority')
                 <a href="{{ route('command-center.index', [], false) }}" class="flex items-center px-4 py-3 mx-2 rounded-lg transition-all {{ request()->routeIs('command-center.*') ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'hover:bg-gray-800 hover:text-white text-indigo-400' }}" title="Análisis de impacto">
                     <svg class="w-5 h-5 min-w-[20px] fill-current" viewBox="0 0 640 640"><path d="M256 144C256 117.5 277.5 96 304 96L336 96C362.5 96 384 117.5 384 144L384 496C384 522.5 362.5 544 336 544L304 544C277.5 544 256 522.5 256 496L256 144zM64 336C64 309.5 85.5 288 112 288L144 288C170.5 288 192 309.5 192 336L192 496C192 522.5 170.5 544 144 544L112 544C85.5 544 64 522.5 64 496L64 336zM496 160L528 160C554.5 160 576 181.5 576 208L576 496C576 522.5 554.5 544 528 544L496 544C469.5 544 448 522.5 448 496L448 208C448 181.5 469.5 160 496 160z"/></svg>
                     <span class="ml-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-medium">Análisis de impacto</span>
                 </a>
-                @endif
+                @endif --}}
             </nav>
             
             <!-- Bottom Actions -->

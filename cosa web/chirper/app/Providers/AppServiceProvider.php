@@ -21,8 +21,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->environment('local')) {
-            URL::forceScheme('http');
-            URL::forceRootUrl(config('app.url'));
+            // URL::forceScheme('http');
+            // URL::forceRootUrl(config('app.url'));
         }
     }
 }

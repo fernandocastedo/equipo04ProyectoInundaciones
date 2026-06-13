@@ -24,9 +24,13 @@ final class ApiAuthenticate
         $token = (string) $request->session()->get('api_token', '');
 
         if ($token === '') {
-            $request->session()->put('intended', $request->getRequestUri());
+            if (! $request->expectsJson()) {
+                $request->session()->put('intended', $request->getRequestUri());
+            }
 
-            return redirect()->route('login');
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Unauthenticated.'], 401)
+                : redirect()->route('login');
         }
 
         if (! $request->session()->has('api_user')) {
@@ -36,7 +40,13 @@ final class ApiAuthenticate
             } catch (ApiUnauthorizedException) {
                 $request->session()->forget(['api_token', 'api_user']);
 
-                return redirect()->route('login');
+                if (! $request->expectsJson()) {
+                    $request->session()->put('intended', $request->getRequestUri());
+                }
+
+                return $request->expectsJson()
+                    ? response()->json(['message' => 'Unauthenticated.'], 401)
+                    : redirect()->route('login');
             }
         }
 

@@ -25,7 +25,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 # Copiar el código del proyecto desde la subcarpeta a la raíz del contenedor
-COPY "cosa web/chirper/" /app/
+COPY ["cosa web/chirper/", "/app/"]
 
 # Instalar dependencias de PHP
 RUN composer install --no-interaction --optimize-autoloader --no-dev

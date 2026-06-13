@@ -134,9 +134,9 @@
             
             @if($isAuthority)
             <div class="border-t border-gray-200 bg-gray-50 p-3">
-                <button onclick="openUpdateModal({{ $donacion->id }}, '{{ $donacion->status }}', '{{ addslashes($donacion->usage_details ?? '') }}', '{{ $donacion->inundacion_id ?? '' }}', '{{ $donacion->victima_id ?? '' }}')" class="w-full rounded bg-white px-3 py-2 text-sm font-semibold text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">
+                <a href="{{ route('donaciones.edit', $donacion->id) }}" class="block text-center w-full rounded bg-white px-3 py-2 text-sm font-semibold text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">
                     Actualizar Uso
-                </button>
+                </a>
             </div>
             @endif
         </div>
@@ -211,59 +211,6 @@
             <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
                 <button type="button" onclick="document.getElementById('modal-create').classList.add('hidden')" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50">Cancelar</button>
                 <button type="submit" class="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 rounded hover:bg-blue-700 shadow-sm">Guardar</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Modal Actualizar Uso -->
-<div id="modal-update" class="hidden fixed inset-0 z-[9990] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[90vh] flex flex-col overflow-hidden">
-        <div class="border-b border-gray-200 bg-gray-50 px-5 py-3 flex justify-between items-center shrink-0">
-            <h2 class="text-base font-bold text-gray-900">Actualizar Uso</h2>
-            <button type="button" onclick="document.getElementById('modal-update').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-        </div>
-        <form id="update-form" method="POST" enctype="multipart/form-data" class="p-5 overflow-y-auto flex-1">
-            @csrf
-            @method('PATCH')
-            <div class="mb-3">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Estado</label>
-                <select name="status" id="update-status" onchange="toggleUpdateStatusFields()" required class="w-full rounded border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 py-2">
-                    <option value="en_inventario">En Inventario</option>
-                    <option value="entregado">Entregado a Víctimas/Inundación</option>
-                </select>
-            </div>
-            
-            <div class="mb-3">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Foto de prueba (Obligatoria al cambiar)</label>
-                <input type="file" name="photo" id="update_photo" accept="image/*" class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded p-1 cursor-pointer">
-            </div>
-
-            <div class="mb-3">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Detalles de uso</label>
-                <textarea name="usage_details" id="update-details" rows="2" placeholder="Explique qué se hizo..." class="w-full rounded border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 py-2"></textarea>
-            </div>
-
-            <div id="entregado_fields" class="hidden border-t border-gray-100 pt-3 mb-4">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Destino (Inundación Obligatoria)</label>
-                <input type="hidden" name="inundacion_id" id="update_inundacion_id">
-                
-                <button type="button" onclick="openInundacionModal('update_inundacion_id', 'update_inundacion_preview')" class="w-full flex items-center justify-between text-left rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:border-blue-500 focus:ring-blue-500 mb-2">
-                    <span id="update_inundacion_preview">Seleccionar Inundación...</span>
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                
-                <select name="victima_id" id="update_victima_id" class="w-full rounded border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 py-2">
-                    <option value="">Seleccionar Víctima (Opcional)...</option>
-                    @foreach($victimas as $v)
-                        <option value="{{ $v->id }}">{{ $v->nombre_completo }} - {{ $v->carnet }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                <button type="button" onclick="document.getElementById('modal-update').classList.add('hidden')" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50">Cancelar</button>
-                <button type="submit" class="px-3 py-1.5 text-xs font-bold text-white bg-gray-800 rounded hover:bg-gray-900 shadow-sm">Actualizar</button>
             </div>
         </form>
     </div>
@@ -386,30 +333,6 @@
         }, 100);
     }
 
-    function openUpdateModal(id, status, details, inundacionId, victimaId) {
-        document.getElementById('update-form').action = '/donaciones/' + id;
-        
-        // Forzar directamente a 'entregado' según requerimiento
-        document.getElementById('update-status').value = 'entregado';
-        
-        document.getElementById('update-details').value = details;
-        document.getElementById('update_inundacion_id').value = inundacionId;
-        document.getElementById('update_victima_id').value = victimaId;
-        
-        // Reset file input
-        document.getElementById('update_photo').value = '';
-        
-        // Check if there was an inundacion selected to show preview
-        if(inundacionId) {
-            document.getElementById('update_inundacion_preview').innerText = 'Inundación Seleccionada (ID: '+inundacionId+')';
-        } else {
-            document.getElementById('update_inundacion_preview').innerText = 'Seleccionar Inundación...';
-        }
-
-        toggleUpdateStatusFields();
-        document.getElementById('modal-update').classList.remove('hidden');
-    }
-
     function toggleDonorCarnet(isAnonymous, inputId) {
         const input = document.getElementById(inputId);
         if (isAnonymous) {
@@ -419,16 +342,6 @@
         } else {
             input.disabled = false;
             input.required = true;
-        }
-    }
-
-    function toggleUpdateStatusFields() {
-        const status = document.getElementById('update-status').value;
-        const entregadoFields = document.getElementById('entregado_fields');
-        if (status === 'entregado') {
-            entregadoFields.classList.remove('hidden');
-        } else {
-            entregadoFields.classList.add('hidden');
         }
     }
 

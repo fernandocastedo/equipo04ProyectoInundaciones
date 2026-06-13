@@ -71,6 +71,22 @@ class DonacionController extends Controller
         return redirect()->route('donaciones.index')->with('success', 'Donación registrada exitosamente.');
     }
 
+    public function edit($id)
+    {
+        $donacion = Donacion::with(['centro', 'donor', 'inundacion.municipio', 'victima'])->findOrFail($id);
+        
+        $inundacionesActivas = Inundacion::activas()->with('municipio')->latest()->get();
+        $inundacionesTerminadas = Inundacion::terminadas()->with('municipio')->latest()->get();
+        $victimas = Victima::all();
+
+        return view('donaciones.edit', [
+            'donacion' => $donacion,
+            'inundacionesActivas' => $inundacionesActivas,
+            'inundacionesTerminadas' => $inundacionesTerminadas,
+            'victimas' => $victimas,
+        ]);
+    }
+
     public function update(Request $request, $id)
     {
         $donacion = Donacion::findOrFail($id);

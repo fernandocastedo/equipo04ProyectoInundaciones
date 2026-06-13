@@ -105,6 +105,7 @@ Route::middleware(ApiAuthenticate::class)->group(function () {
 
         // ── Donaciones (escritura) ────────────────────────────────────────────
         Route::post('/donaciones', [DonacionController::class, 'store'])->name('donaciones.store');
+        Route::get('/donaciones/{id}/edit', [DonacionController::class, 'edit'])->name('donaciones.edit')->where('id', '[0-9]+');
         Route::patch('/donaciones/{id}', [DonacionController::class, 'update'])->name('donaciones.update');
     });
 });

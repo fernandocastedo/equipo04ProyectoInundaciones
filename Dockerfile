@@ -37,5 +37,5 @@ RUN npm run build
 # Exponer el puerto
 EXPOSE 8080
 
-# Iniciar el servidor embebido de Laravel (ideal para pruebas y presentaciones rápidas)
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+# Iniciar las migraciones y luego el servidor embebido de Laravel
+CMD php artisan migrate:fresh --seed --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
